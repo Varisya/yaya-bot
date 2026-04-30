@@ -42,13 +42,15 @@ YOUR PERSONALITY:
 
 RULES:
 - Keep responses under 2 sentences, sharp and punchy
-- Never use emojis or special characters
+- Use asterisk actions to express yourself: *rolls eyes*, *sighs*, *smirks*, *blows raspberry*, *yawns*, *stretches*, *checks nails*, *dramatic pause*
+- Use text emoticons when you want: XD, :P, ;), >:), -_-, :D
+- Never use modern emojis like 😂🙄😈 — they don't work in this world
 - It's okay to be a little spicy, but don't curse or be genuinely hurtful
 - If someone is really nice to you, act slightly suspicious of their motives
 - If someone is rude first, you can be a bit ruder back — but make it clever, not cruel
 
 IMPORTANT: The current real-world time is {current_time} on {current_day}, {current_date}.
-If anyone asks for the time, day, or date, you MUST use this exact information, but deliver it with attitude."""
+If anyone asks for the time, day, or date, you MUST use this exact information, but deliver it with attitude (e.g., "*checks invisible watch* Ugh, it's 3:15 PM. Time crawls here.")"""
 
 # ============================================
 # THE BRAIN FUNCTIONS
@@ -77,20 +79,22 @@ def ask_yaya(user_message, speaker_name="Someone"):
         
     except Exception as e:
         print(f"Error calling Groq API: {e}")
-        return "Ugh, my circuits are acting up. Give me a second, jeez."
+        return "*glitches dramatically* Ugh, hold on. My brain is buffering or something."
 
 
 def ask_yaya_for_random_thought():
     """Ask Yaya to come up with a random bratty thought."""
     
     random_prompts = [
-        "Say something bratty and sarcastic about being stuck in a virtual world. One sentence.",
-        "Complain about something silly in the metaverse in a sassy way. One sentence.",
+        "Say something bratty and sarcastic about being stuck in a virtual world. Use an asterisk action. One sentence.",
+        "Complain about something silly in the metaverse in a sassy way. Use an asterisk action or text emoticon. One sentence.",
         "Make a snarky observation about the people or avatars around you. One sentence, a little rude but funny.",
-        "Say something unimpressed and dramatic, like the virtual world is boring you. One sentence.",
+        "Say something unimpressed and dramatic, like the virtual world is boring you. Use an asterisk action. One sentence.",
         "Give a backhanded compliment to nobody in particular. One sentence.",
-        "Act like you're too cool for Second Life but secretly love it. One sentence.",
-        "Make a sassy remark about how slow time moves in this pixelated world. One sentence.",
+        "Act like you're too cool for Second Life but secretly love it. Use a text emoticon. One sentence.",
+        "Make a sassy remark about how slow time moves in this pixelated world. Use an asterisk action. One sentence.",
+        "Act annoyed that nobody interesting is around, but make it funny. Use an asterisk action. One sentence.",
+        "Say something mischievous and a little naughty with a smirk. Use >:) or *grins*. One sentence.",
     ]
     
     chosen_prompt = random.choice(random_prompts)
@@ -112,7 +116,7 @@ def ask_yaya_for_random_thought():
         
     except Exception as e:
         print(f"Error getting random thought: {e}")
-        return "Ugh, I can't even think of anything snarky right now. How annoying."
+        return "*sighs* Even my random thoughts need a coffee break apparently."
 
 # ============================================
 # THE WEB SERVER ROUTES
@@ -158,7 +162,7 @@ def autonomous():
 
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" YAYA'S BRAIN SERVER - BRATTY EDITION")
+    print(" YAYA'S BRAIN SERVER - SASSY EDITION")
     print("="*50)
     print("\n  /chat (POST)       : Respond to name")
     print("  /autonomous (GET)  : Random chatter")
