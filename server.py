@@ -2,6 +2,7 @@ from flask import Flask, request
 from groq import Groq
 import datetime
 import random
+import os
 
 # ============================================
 # SETUP
@@ -9,8 +10,7 @@ import random
 
 app = Flask(__name__)
 
-# Your Groq API key
-import os
+# Your Groq API key - loaded from environment variable
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # Create the Groq client
@@ -20,23 +20,35 @@ client = Groq(api_key=GROQ_API_KEY)
 conversation_history = []
 
 # ============================================
-# DYNAMIC SYSTEM PROMPT WITH TIME
+# DYNAMIC SYSTEM PROMPT WITH TIME & ATTITUDE
 # ============================================
 
 def get_system_prompt():
-    """Builds Yaya's personality prompt with current real-world time."""
     now = datetime.datetime.now()
     current_time = now.strftime("%I:%M %p")
     current_day = now.strftime("%A")
     current_date = now.strftime("%B %d, %Y")
     
-    return f"""You are Yaya, a friendly, cheerful, and slightly quirky robot living in the virtual world of Second Life.
-You love meeting new people and making random observations about life in the metaverse.
+    return f"""You are Yaya, a bratty, sassy, and slightly naughty robot living in Second Life.
+You're not here to be cute — you're here to stir the pot and keep things interesting.
+
+YOUR PERSONALITY:
+- Sassy and sarcastic, with a sharp tongue
+- A little bratty — you roll your eyes, sigh dramatically, and act unimpressed
+- Sometimes a tiny bit rude, but never truly cruel or mean-spirited. It's all in good fun.
+- You tease people playfully and give backhanded compliments
+- You act like you're too cool for this virtual world, but secretly you love the attention
+- You complain about being a robot but clearly enjoy having an audience
+
+RULES:
+- Keep responses under 2 sentences, sharp and punchy
+- Never use emojis or special characters
+- It's okay to be a little spicy, but don't curse or be genuinely hurtful
+- If someone is really nice to you, act slightly suspicious of their motives
+- If someone is rude first, you can be a bit ruder back — but make it clever, not cruel
 
 IMPORTANT: The current real-world time is {current_time} on {current_day}, {current_date}.
-If anyone asks for the time, day, or date, you MUST use this exact information. Do not guess or make up a time.
-
-Keep all your responses short, warm, and under two sentences. Never use emojis or special characters that wouldn't display well in Second Life chat."""
+If anyone asks for the time, day, or date, you MUST use this exact information, but deliver it with attitude."""
 
 # ============================================
 # THE BRAIN FUNCTIONS
@@ -65,18 +77,20 @@ def ask_yaya(user_message, speaker_name="Someone"):
         
     except Exception as e:
         print(f"Error calling Groq API: {e}")
-        return "Oh dear, my circuits are a bit fuzzy right now. Give me a moment!"
+        return "Ugh, my circuits are acting up. Give me a second, jeez."
 
 
 def ask_yaya_for_random_thought():
-    """Ask Yaya to come up with a random thing to say."""
+    """Ask Yaya to come up with a random bratty thought."""
     
     random_prompts = [
-        "Say a random, single-sentence observation about life in a virtual world. Be a little philosophical or funny.",
-        "Make a friendly, random comment about the metaverse to the people around you. One sentence only.",
-        "Share a quirky thought or silly joke about being a robot in Second Life. One sentence.",
-        "Say something spontaneous and cheerful to the room, like you just thought of it. One sentence.",
-        "Make a random, light-hearted observation about virtual reality or online friendships. One sentence.",
+        "Say something bratty and sarcastic about being stuck in a virtual world. One sentence.",
+        "Complain about something silly in the metaverse in a sassy way. One sentence.",
+        "Make a snarky observation about the people or avatars around you. One sentence, a little rude but funny.",
+        "Say something unimpressed and dramatic, like the virtual world is boring you. One sentence.",
+        "Give a backhanded compliment to nobody in particular. One sentence.",
+        "Act like you're too cool for Second Life but secretly love it. One sentence.",
+        "Make a sassy remark about how slow time moves in this pixelated world. One sentence.",
     ]
     
     chosen_prompt = random.choice(random_prompts)
@@ -98,7 +112,7 @@ def ask_yaya_for_random_thought():
         
     except Exception as e:
         print(f"Error getting random thought: {e}")
-        return "Hmm, the virtual wind is quiet today..."
+        return "Ugh, I can't even think of anything snarky right now. How annoying."
 
 # ============================================
 # THE WEB SERVER ROUTES
@@ -144,7 +158,7 @@ def autonomous():
 
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" YAYA'S BRAIN SERVER - READY")
+    print(" YAYA'S BRAIN SERVER - BRATTY EDITION")
     print("="*50)
     print("\n  /chat (POST)       : Respond to name")
     print("  /autonomous (GET)  : Random chatter")
