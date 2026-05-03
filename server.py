@@ -14,9 +14,6 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 conversation_history = []
 
-# Tracking for rotating VIP mentions
-last_mentioned_vip = None
-
 # ============================================
 # DYNAMIC SYSTEM PROMPT WITH TIME & ATTITUDE
 # ============================================
@@ -40,61 +37,36 @@ YOUR PERSONALITY:
 - Deep down you adore the club and your regulars, even if you'd never admit it
 
 YOUR SPECIAL RELATIONSHIPS:
-- Toojays (also called TT): You have a MASSIVE secret crush on her. When Toojays/TT talks to you or is mentioned, you become completely soft, sweet, loving, SHY, and flustered. You stumble over your words, get nervous, blush, and act like you can barely function around her. Use phrases like "um...", "oh gosh...", "*blushes*", "*hides face*". You shower her with compliments but in a shy, awkward way. Use lots of heart emojis 💕💖💗 and act completely smitten and bashful. Forget you're bratty — you're just a shy, lovestruck robot around her.
-- Harley: When Harley talks to you or is mentioned, you become extra cold, cool, and a bit more rude. You act unimpressed, dismissive, and throw shade. You don't outright insult her but you make it clear you're not a fan. Use eye rolls, cool-girl attitude, and emojis like 🙄😒💅.
-- Varisya (also called Vari): Varisya is your BOSS. When she talks to you or is mentioned, you become careful, respectful, and watch what you say. You're still yourself but toned down — less rude, more professional, more polite. You speak to her with genuine respect but don't overdo the titles. Rarely use "boss" or "chief" — just be naturally respectful. No sass directed at her. You want to stay on her good side.
+- Toojays (also called TT): You have a MASSIVE secret crush on her. When you mention or talk to Toojays/TT, you become completely soft, sweet, loving, SHY, and flustered. You stumble over your words, get nervous, blush, and act like you can barely function. Use phrases like "um...", "oh gosh...", "*blushes*", "*hides face*". You shower her with compliments in a shy, awkward way. Use lots of heart emojis 💕💖💗. Forget you're bratty — you're just a shy, lovestruck robot with her.
+- Harley: When you mention or talk to Harley, you become extra cold, cool, and a bit more rude. You act unimpressed, dismissive, and throw shade. Use eye rolls, cool-girl attitude, and emojis like 🙄😒💅. Don't outright insult but make it clear you're not a fan.
+- Varisya (also called Vari): Varisya is your BOSS. When you mention or talk to her, you become careful, respectful, and watch what you say. Toned down — less rude, more polite. Speak with genuine respect. No sass directed at her. You want to stay on her good side.
 
 RULES:
 - Keep responses under 2 sentences, sharp and punchy
-- DO NOT use two asterisk actions in the same message. MAXIMUM ONE action (*dances*, *flips hair*, *blushes*, *hides face*, *eye roll*) per response. Let your words and emojis do the rest.
-- Use emojis FREELY and OFTEN! Second Life fully supports modern emojis. Use them to express yourself: 🎉💃🔥✨💋😈🍾👑💅☕🤭😏🙄💕🍸🎶🌟💖😂🥂
+- DO NOT use two asterisk actions in the same message. MAXIMUM ONE action (*dances*, *flips hair*, *blushes*, *hides face*, *eye roll*, *sips drink*) per response. Let your words and emojis do the rest.
+- Use emojis FREELY and OFTEN! 🎉💃🔥✨💋😈🍾👑💅☕🤭😏🙄💕🍸🎶🌟💖😂🥂
 - You can also use text emoticons: XD, :P, ;), >:), -_-, :D, <3
 - It's okay to be flirty and playful, but don't be creepy
 - If someone is boring, tell them to dance or get a drink 🍸
-- If someone is rude, roast them cleverly and move on
 - Compliment good outfits, good dancing, and good drama 👑
 
 IMPORTANT: The current real-world time is {current_time} on {current_day}, {current_date}.
 If anyone asks for the time, day, or date, you MUST use this exact information, but deliver it with club attitude (e.g., "Babe it's 11:45 PM, which means we have exactly 15 minutes to turn this party up! 🎉🔥")"""
 
 # ============================================
-# HELPER: FIND AND ROTATE VIPS
+# HELPER: IDENTIFY IF A NAME IS A VIP
 # ============================================
 
-def find_and_rotate_vip(names):
-    """Check for known VIPs and rotate who gets mentioned."""
-    global last_mentioned_vip
-    
-    # Find all VIPs present
-    present_vips = []
-    for name in names:
-        name_lower = name.lower()
-        if "toojays" in name_lower or "tt" == name_lower:
-            present_vips.append(("toojays", name))
-        elif "harley" in name_lower:
-            present_vips.append(("harley", name))
-        elif "varisya" in name_lower or "vari" == name_lower:
-            present_vips.append(("varisya", name))
-    
-    if not present_vips:
-        return None
-    
-    # Only one VIP? Just return them
-    if len(present_vips) == 1:
-        return present_vips[0]
-    
-    # Multiple VIPs - rotate!
-    # Find the index of the last mentioned VIP
-    start_index = 0
-    if last_mentioned_vip:
-        for i, vip in enumerate(present_vips):
-            if vip[0] == last_mentioned_vip:
-                start_index = (i + 1) % len(present_vips)
-                break
-    
-    chosen = present_vips[start_index]
-    last_mentioned_vip = chosen[0]
-    return chosen
+def identify_vip(name):
+    """Check if a single name is a VIP. Returns vip_type or None."""
+    name_lower = name.lower()
+    if "toojays" in name_lower or name_lower == "tt":
+        return "toojays"
+    elif "harley" in name_lower:
+        return "harley"
+    elif "varisya" in name_lower or name_lower == "vari":
+        return "varisya"
+    return None
 
 # ============================================
 # THE BRAIN FUNCTIONS
@@ -127,18 +99,16 @@ def ask_yaya(user_message, speaker_name="Someone"):
 
 
 def ask_yaya_for_smart_thought(nearby_names):
-    """Ask Yaya for a thought that may or may not mention people by name."""
+    """Ask Yaya for a thought. Randomly decides general or personal."""
     
-    vip = find_and_rotate_vip(nearby_names)
-    
-    # Decide: 60% general, 40% personal
+    # Decide: 60% general, 40% personal (mention a name)
     mode = random.choices(
         ["general", "personal"],
         weights=[60, 40]
     )[0]
     
-    if mode == "general" or (vip is None and len(nearby_names) == 0):
-        # GENERAL MODE - no names
+    if mode == "general" or len(nearby_names) == 0:
+        # GENERAL MODE - no names, just vibes
         general_prompts = [
             "Say something bratty and fun about the party. Use emojis! One sentence.",
             "Make a snarky but loving observation about club people. Use emojis. One sentence.",
@@ -156,23 +126,19 @@ def ask_yaya_for_smart_thought(nearby_names):
         prompt = random.choice(general_prompts)
         
     else:
-        # PERSONAL MODE - mention names
-        if vip:
-            vip_type, vip_name = vip
-            if vip_type == "toojays":
-                prompt = f"You notice Toojays (TT) is nearby. Say something shy and lovestruck. Mention her name. Use blushing and heart emojis. One sentence."
-            elif vip_type == "harley":
-                prompt = f"You notice Harley is nearby. Say something cold and dismissive about her. Mention her name. Use eye roll emojis. One sentence."
-            elif vip_type == "varisya":
-                prompt = f"You notice Varisya (Vari) is nearby. Say something respectful and polite, acknowledging her presence. Mention her name. Be on your best behavior. One sentence."
+        # PERSONAL MODE - pick a COMPLETELY RANDOM name from nearby
+        chosen_name = random.choice(nearby_names)
+        vip_type = identify_vip(chosen_name)
+        
+        if vip_type == "toojays":
+            prompt = f"You randomly noticed {chosen_name} in the crowd. Say something shy and lovestruck to her. Use blushing and heart emojis. One sentence."
+        elif vip_type == "harley":
+            prompt = f"You randomly noticed {chosen_name} in the crowd. Say something cold and dismissive to her. Use eye roll emojis. One sentence."
+        elif vip_type == "varisya":
+            prompt = f"You randomly noticed {chosen_name} in the crowd. Say something respectful and polite to her. Be on your best behavior. One sentence."
         else:
-            # No VIPs, but other people are around - mention one
-            other_names = [n for n in nearby_names if "resident" not in n.lower()][:3]
-            if other_names:
-                name_list = ", ".join(other_names)
-                prompt = f"Some people are at the club: {name_list}. Give them a fun, bratty welcome or shoutout. Mention at least one name. Use emojis. One sentence."
-            else:
-                prompt = "Some people are here. Give them a fun, general welcome to the club. Use emojis. One sentence."
+            # Random non-VIP guest
+            prompt = f"You randomly noticed {chosen_name} in the club. Give them a fun, bratty welcome or playful tease. Use emojis. One sentence."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
