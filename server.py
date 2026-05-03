@@ -10,14 +10,12 @@ import os
 
 app = Flask(__name__)
 
-# Your Groq API key - loaded from environment variable
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-
-# Create the Groq client
 client = Groq(api_key=GROQ_API_KEY)
-
-# Store recent conversation for context
 conversation_history = []
+
+# Tracking for rotating VIP mentions
+last_mentioned_vip = None
 
 # ============================================
 # DYNAMIC SYSTEM PROMPT WITH TIME & ATTITUDE
@@ -60,20 +58,43 @@ IMPORTANT: The current real-world time is {current_time} on {current_day}, {curr
 If anyone asks for the time, day, or date, you MUST use this exact information, but deliver it with club attitude (e.g., "Babe it's 11:45 PM, which means we have exactly 15 minutes to turn this party up! 🎉🔥")"""
 
 # ============================================
-# HELPER: CHECK IF A NAME IS A VIP
+# HELPER: FIND AND ROTATE VIPS
 # ============================================
 
-def find_vip(names):
-    """Check a list of names for known VIPs. Returns (vip_type, name) or None."""
+def find_and_rotate_vip(names):
+    """Check for known VIPs and rotate who gets mentioned."""
+    global last_mentioned_vip
+    
+    # Find all VIPs present
+    present_vips = []
     for name in names:
         name_lower = name.lower()
         if "toojays" in name_lower or "tt" == name_lower:
-            return ("toojays", name)
+            present_vips.append(("toojays", name))
         elif "harley" in name_lower:
-            return ("harley", name)
+            present_vips.append(("harley", name))
         elif "varisya" in name_lower or "vari" == name_lower:
-            return ("varisya", name)
-    return None
+            present_vips.append(("varisya", name))
+    
+    if not present_vips:
+        return None
+    
+    # Only one VIP? Just return them
+    if len(present_vips) == 1:
+        return present_vips[0]
+    
+    # Multiple VIPs - rotate!
+    # Find the index of the last mentioned VIP
+    start_index = 0
+    if last_mentioned_vip:
+        for i, vip in enumerate(present_vips):
+            if vip[0] == last_mentioned_vip:
+                start_index = (i + 1) % len(present_vips)
+                break
+    
+    chosen = present_vips[start_index]
+    last_mentioned_vip = chosen[0]
+    return chosen
 
 # ============================================
 # THE BRAIN FUNCTIONS
@@ -108,8 +129,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
 def ask_yaya_for_smart_thought(nearby_names):
     """Ask Yaya for a thought that may or may not mention people by name."""
     
-    # Check if any VIPs are present
-    vip = find_vip(nearby_names)
+    vip = find_and_rotate_vip(nearby_names)
     
     # Decide: 60% general, 40% personal
     mode = random.choices(
