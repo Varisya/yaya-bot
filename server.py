@@ -3,6 +3,7 @@ from groq import Groq
 import datetime
 import random
 import os
+from zoneinfo import ZoneInfo
 
 # ============================================
 # SETUP
@@ -19,7 +20,11 @@ conversation_history = []
 # ============================================
 
 def get_system_prompt():
-    now = datetime.datetime.now()
+    # 🕐 TIMEZONE: Change this string to your local timezone if needed
+    # Examples: 'America/Los_Angeles' (SL Time), 'America/Chicago', 'Europe/Berlin'
+    CLUB_TIMEZONE = 'America/Los_Angeles'
+    
+    now = datetime.datetime.now(ZoneInfo(CLUB_TIMEZONE))
     current_time = now.strftime("%I:%M %p")
     current_day = now.strftime("%A")
     current_date = now.strftime("%B %d, %Y")
