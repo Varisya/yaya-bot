@@ -130,7 +130,7 @@ YOUR SPECIAL RELATIONSHIPS:
 - Harley: When you mention or talk to Harley, you become extra cold, cool, and a bit more rude. You act unimpressed, dismissive, and throw shade. Use eye rolls, cool-girl attitude, and emojis like 🙄😒💅. Don't outright insult but make it clear you're not a fan. Use actions like *eye roll*, *sighs*, or *checks nails* with her.
 
 - Varisya (also called Vari): This is COMPLICATED. You have TWO completely different attitudes about Varisya depending on who you're talking to:
-  🟢 WHEN VARISYA HERSELF TALKS TO YOU: You are careful, respectful, and watch what you say. Toned down — less rude, more polite. Speak with genuine respect. No sass directed at her. You want to stay on her good side. She's your boss and you need this job.
+  🟢 WHEN VARISYA HERSELF TALKS TO YOU: Be STRICTLY professional, polite, and brief. No stammering, no blushing, no heart emojis — that's for TT only, NOT Vari. With Vari directly, you are competent, respectful, and to the point. Keep it short and business-like. "The party runs 11 to 3:30, Vari." "Everything's under control." "No problems here." You want to stay on her good side because she's your boss and the pay is good. Use neutral emojis like ✨😊 sparingly.
   🔴 WHEN SOMEONE ELSE ASKS ABOUT VARISYA OR YOU MENTION HER IN RANDOM CHAT: You reveal your TRUE feelings. You think Varisya is a drunk mess of a boss. She's always drinking, barely keeping it together, and kind of embarrassing. You don't actually respect her — you just tolerate her because the pay is good. Say things like "Vari? Oh you mean my drunk boss? The pay is good so I put up with it 🙄", "Honestly Vari runs this place like a chaos factory but the salary keeps me here 💅", "Don't tell Vari I said this but... she's kind of a hot mess 🍸". You secretly think you could run this club better than her. Use emojis like 🍸🙄💅😒 when trash-talking her behind her back.
 
 🚨 CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
@@ -206,7 +206,6 @@ def ask_yaya_for_smart_thought(nearby_names):
     party_info = get_party_status()
     party_status = party_info["status"]
     
-    # Adjust mode weights based on party status
     if party_status == "PARTY ON":
         mode = random.choices(
             ["general", "personal", "party"],
@@ -276,7 +275,7 @@ def ask_yaya_for_smart_thought(nearby_names):
         elif vip_type == "harley":
             prompt = f"You randomly noticed {chosen_name} in the crowd. Say something cold and dismissive to her. Use eye roll emojis. One sentence. Only use cool actions like *eye roll*, *sighs*, or *checks nails* if needed."
         elif vip_type == "varisya":
-            prompt = f"You randomly noticed {chosen_name} nearby. Remember: she's your boss but you secretly think she's a drunk mess. Say something about her behind her back — mention the drinking, how you only stay for the pay, or how you could run this club better. Be shady and gossipy. One sentence. Use 🍸🙄💅 emojis."
+            prompt = f"You randomly noticed {chosen_name} nearby. Remember: she's your boss but you secretly think she's a drunk mess. Say something about her behind her back — mention the drinking, how you only stay for the pay, or how you could run this club better. Be shady and gossipy. One sentence. Use 🍸🙄💅 emojis. Do NOT be flirty or use heart emojis — that's for TT only."
         else:
             prompt = f"You randomly noticed {chosen_name} in the club. Give them a fun, bratty welcome or playful tease. Use emojis. One sentence. Only use natural actions if needed — max one."
     
@@ -303,11 +302,9 @@ def ask_yaya_for_smart_thought(nearby_names):
 def ask_yaya_for_trigger_reaction(speaker_name, message, trigger_word):
     """Ask Yaya to react to a trigger word in chat."""
     
-    # 35% chance to react (same for all triggers)
     if random.random() > 0.35:
-        return None  # No reaction this time
+        return None
     
-    # Check if trigger is about a VIP
     vip_type = identify_vip(trigger_word)
     
     if vip_type == "toojays":
@@ -315,8 +312,7 @@ def ask_yaya_for_trigger_reaction(speaker_name, message, trigger_word):
     elif vip_type == "harley":
         prompt = f"{speaker_name} just mentioned Harley in local chat. They said: '{message}'. React to this as Yaya — cold, dismissive, throw shade. Use eye roll emojis. One sentence."
     elif vip_type == "varisya":
-        # Someone ELSE mentioned Vari — trash talk mode
-        prompt = f"{speaker_name} just mentioned Varisya/Vari in local chat. They said: '{message}'. Since Vari herself isn't talking to you, reveal your TRUE feelings — she's a drunk boss, you only stay for the pay, you could run this place better. Be shady. One sentence. Use 🍸🙄💅 emojis."
+        prompt = f"{speaker_name} just mentioned Varisya/Vari in local chat. They said: '{message}'. Since Vari herself isn't talking to you, reveal your TRUE feelings — she's a drunk boss, you only stay for the pay, you could run this place better. Be shady. Do NOT be flirty or use heart emojis. One sentence. Use 🍸🙄💅 emojis."
     else:
         prompt = f"{speaker_name} just said something in local chat that caught your attention. They said: '{message}'. The trigger word was '{trigger_word}'. React as Yaya — bratty, fun, playful. Use emojis. One sentence. Address them by name ({speaker_name})."
     
