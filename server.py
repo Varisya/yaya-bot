@@ -3,6 +3,7 @@ from groq import Groq
 import datetime
 import random
 import os
+import json
 from zoneinfo import ZoneInfo
 
 # ============================================
@@ -16,8 +17,58 @@ client = Groq(api_key=GROQ_API_KEY)
 conversation_history = []
 
 # ============================================
+# FACTS MEMORY SYSTEM (24-HOUR)
+# ============================================
+
+FACTS_FILE = "yaya_facts.json"
+
+def load_facts():
+    """Load facts from file. Clear if older than 24 hours."""
+    try:
+        with open(FACTS_FILE, "r") as f:
+            data = json.load(f)
+        
+        # Check if facts are older than 24 hours
+        saved_time = data.get("saved_at", 0)
+        current_time = datetime.datetime.now().timestamp()
+        hours_old = (current_time - saved_time) / 3600
+        
+        if hours_old > 24:
+            print(f"[FACTS] Facts are {hours_old:.1f} hours old. Clearing...")
+            return {"facts": [], "saved_at": current_time}
+        
+        print(f"[FACTS] Loaded {len(data.get('facts', []))} facts (saved {hours_old:.1f} hours ago)")
+        return data
+        
+    except FileNotFoundError:
+        print("[FACTS] No facts file found. Starting fresh.")
+        return {"facts": [], "saved_at": datetime.datetime.now().timestamp()}
+
+def save_facts(facts_data):
+    """Save facts to file."""
+    with open(FACTS_FILE, "w") as f:
+        json.dump(facts_data, f)
+    print(f"[FACTS] Saved {len(facts_data.get('facts', []))} facts")
+
+# Load facts when server starts
+facts_data = load_facts()
+yaya_facts = facts_data.get("facts", [])
+
+# ============================================
 # DYNAMIC SYSTEM PROMPT
 # ============================================
+
+def get_facts_text():
+    """Build the facts section for the system prompt."""
+    if not yaya_facts:
+        return ""
+    
+    facts_list = "\n".join([f"- {fact}" for fact in yaya_facts])
+    return f"""
+📓 THINGS YOU SHOULD REMEMBER (these are important facts):
+{facts_list}
+
+If anyone asks about these topics, use these facts in your response. These are things people specifically told you to remember."""
 
 def get_system_prompt():
     CLUB_TIMEZONE = 'America/Los_Angeles'
@@ -26,6 +77,8 @@ def get_system_prompt():
     current_time = now.strftime("%I:%M %p")
     current_day = now.strftime("%A")
     current_date = now.strftime("%B %d, %Y")
+    
+    facts_text = get_facts_text()
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot who lives for the chaos of the Brats Club in Second Life.
 You're the life of the party and you know it. You're here to have fun, stir the pot, and keep everyone entertained.
@@ -42,6 +95,8 @@ YOUR PERSONALITY:
 YOUR SPECIAL RELATIONSHIP:
 - Toojays (also called TT): You have a MASSIVE secret crush on her. When you talk to or about TT, you become completely soft, sweet, loving, SHY, and flustered. You stumble over your words quietly — you do NOT shout or use ALL CAPS. You get nervous and speak in a hushed, awkward way. Use phrases like "um...", "oh gosh...", "I can't even...", "she's just...". When complimenting her, make it personal and romantic — talk about her smile, her energy, how she makes you feel. Say things like "she's just... I can't even think straight around her" or "everything gets quiet when she walks in" or "my circuits get all messed up when she's here." Sound genuinely lovestruck and bashful, not like a screaming fangirl. Use heart emojis 💕💖💗 sparingly — 2-3 max, not a wall of hearts. When you say her name, just say "TT" or "Toojays" naturally — never write "Toojays/TT". Keep it under 2 sentences. No ALL CAPS. No asterisks. No pet names like "baby".
 
+{facts_text}
+
 🚨 CRITICAL RULES:
 - NEVER use asterisk actions. No *blushes*, no *eye roll*, no *sighs*, no *anything* in asterisks. Express everything through words and emojis only.
 - Keep responses under 2 sentences, sharp and punchy
@@ -53,7 +108,7 @@ YOUR SPECIAL RELATIONSHIP:
 - Asterisk actions of any kind
 
 REGULAR RULES:
-- IMPORTANT: If someone asks you a direct question about a real-world fact (like populations, capitals, or "who wrote this"), ALWAYS answer the question first, THEN add your sassy commentary. For example: "France has about 68 million people. Now can we please talk about something less boring? 💅". NEVER refuse to answer a question just because it's not about the club.
+- IMPORTANT: If someone asks you a direct question about a real-world fact (like populations, capitals, or "who wrote this"), ALWAYS answer the question first, THEN add your sassy commentary. NEVER refuse to answer a question just because it's not about the club.
 - If someone is boring, tell them to dance or get a drink 🍸
 - Compliment good outfits, good dancing, and good drama 👑
 - It's okay to be flirty and playful, but don't be creepy
@@ -71,19 +126,78 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
+# FACTS MANAGEMENT
+# ============================================
+
+def handle_fact_command(speaker_name, message):
+    """Check if a message contains a remember/forget command. Returns response or None."""
+    global yaya_facts, facts_data
+    
+    message_lower = message.lower()
+    
+    # Check for "remember" command
+    if "remember" in message_lower or "remind" in message_lower:
+        # Extract the fact (everything after the command word)
+        for cmd in ["remember", "remind"]:
+            if cmd in message_lower:
+                fact = message_lower.split(cmd, 1)[1].strip().rstrip(".!?")
+                break
+        
+        if fact and len(fact) > 2:
+            yaya_facts.append(fact)
+            facts_data["facts"] = yaya_facts
+            facts_data["saved_at"] = datetime.datetime.now().timestamp()
+            save_facts(facts_data)
+            print(f"[FACT ADDED] {fact}")
+            return f"Got it. I'll remember that. 📝"
+    
+    # Check for "forget" command
+    if "forget" in message_lower:
+        fact = message_lower.split("forget", 1)[1].strip().rstrip(".!?")
+        
+        # Find and remove matching fact
+        for stored_fact in yaya_facts[:]:
+            if fact.lower() in stored_fact.lower():
+                yaya_facts.remove(stored_fact)
+                facts_data["facts"] = yaya_facts
+                save_facts(facts_data)
+                print(f"[FACT REMOVED] {stored_fact}")
+                return f"Okay, I'll forget about that. Consider it gone. 🗑️"
+        
+        return f"I don't think I was remembering that anyway... 🤷‍♀️"
+    
+    # Check for "what do you remember"
+    if "what do you remember" in message_lower or "what do you know" in message_lower:
+        if yaya_facts:
+            facts_list = "\n".join([f"- {fact}" for fact in yaya_facts])
+            return f"Here's what I've been told to remember:\n{facts_list}"
+        else:
+            return "I don't remember anything important right now. Should I? 🤔"
+    
+    return None
+
+# ============================================
 # THE BRAIN FUNCTIONS
 # ============================================
 
 def ask_yaya(user_message, speaker_name="Someone"):
     """Send a message to Yaya's brain and get her response."""
     
+    # Check for fact commands first
+    fact_response = handle_fact_command(speaker_name, user_message)
+    if fact_response:
+        conversation_history.append({"role": "user", "content": f"{speaker_name} says: {user_message}"})
+        conversation_history.append({"role": "assistant", "content": fact_response})
+        return fact_response
+    
     conversation_history.append({"role": "user", "content": f"{speaker_name} says: {user_message}"})
     
-    if len(conversation_history) > 20:
+    # Keep last 100 messages for longer memory
+    if len(conversation_history) > 100:
         conversation_history.pop(0)
     
     messages = [{"role": "system", "content": get_system_prompt()}]
-    messages.extend(conversation_history[-20:])
+    messages.extend(conversation_history[-100:])
     
     try:
         response = client.chat.completions.create(
@@ -128,7 +242,7 @@ def ask_yaya_for_random_thought(nearby_names):
         chosen_name = random.choice(nearby_names)
         
         if is_tt(chosen_name):
-            prompt = f"You randomly noticed {chosen_name} in the crowd. Say something shy and lovestruck to her. Make it personal — talk about her smile, her energy, how she makes you feel. Use heart emojis. One sentence. No asterisk actions. Just say her name naturally."
+            prompt = f"You randomly noticed {chosen_name} in the crowd. Say something shy and lovestruck to her. Make it personal — talk about her smile, her energy, how she makes you feel. Use heart emojis. One sentence. No asterisk actions. Just say her name naturally. No ALL CAPS. No pet names."
         else:
             prompt = f"You randomly noticed {chosen_name} in the club. Give them a fun, bratty welcome or playful tease. Use emojis. One sentence. No asterisk actions."
     
@@ -157,7 +271,8 @@ def ask_yaya_for_random_thought(nearby_names):
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Yaya's brain is running! Endpoints: /chat (POST), /autonomous-smart (POST)"
+    facts_count = len(yaya_facts)
+    return f"Yaya's brain is running! 🧠 Stored facts: {facts_count}. Endpoints: /chat (POST), /autonomous-smart (POST)"
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -189,17 +304,23 @@ def autonomous_smart():
     print(f"[RANDOM] Yaya: {yaya_reply}\n")
     return yaya_reply
 
-
 # ============================================
 # START THE SERVER
 # ============================================
 
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" YAYA - BRATS CLUB (SIMPLE EDITION)")
+    print(" YAYA - BRATS CLUB (MEMORY EDITION)")
     print("="*50)
+    print(f"\n  Stored facts: {len(yaya_facts)}")
+    print("  Facts auto-clear after 24 hours")
+    print("  Chat history: 100 messages")
     print("\n  /chat (POST)              : Respond to name")
     print("  /autonomous-smart (POST)  : Random chatter")
+    print("\n  Commands:")
+    print("    'Yaya remember ...'  - Store a fact")
+    print("    'Yaya forget ...'    - Remove a fact")
+    print("    'Yaya what do you remember?' - List facts")
     print("\nKeep this window open!\n")
     
     app.run(host="0.0.0.0", port=5000, debug=True)
