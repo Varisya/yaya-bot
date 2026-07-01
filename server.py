@@ -4,6 +4,7 @@ import datetime
 import random
 import os
 import json
+import time
 from zoneinfo import ZoneInfo
 
 # ============================================
@@ -17,6 +18,30 @@ client = Groq(api_key=GROQ_API_KEY)
 conversation_history = []
 
 # ============================================
+# RATE LIMITING PROTECTION
+# ============================================
+
+request_times = []  # Track timestamps of recent requests
+MAX_REQUESTS_PER_MINUTE = 25  # Safely under the 30 RPM limit
+RATE_LIMIT_WINDOW = 60  # 60 seconds
+
+def check_rate_limit():
+    """Check if we're about to exceed rate limits. Returns True if safe, False if limited."""
+    global request_times
+    current_time = time.time()
+    
+    # Remove requests older than 60 seconds
+    request_times = [t for t in request_times if current_time - t < RATE_LIMIT_WINDOW]
+    
+    # Check if we're at the limit
+    if len(request_times) >= MAX_REQUESTS_PER_MINUTE:
+        return False
+    
+    # Record this request
+    request_times.append(current_time)
+    return True
+
+# ============================================
 # FACTS MEMORY SYSTEM (24-HOUR)
 # ============================================
 
@@ -28,7 +53,6 @@ def load_facts():
         with open(FACTS_FILE, "r") as f:
             data = json.load(f)
         
-        # Check if facts are older than 24 hours
         saved_time = data.get("saved_at", 0)
         current_time = datetime.datetime.now().timestamp()
         hours_old = (current_time - saved_time) / 3600
@@ -50,7 +74,6 @@ def save_facts(facts_data):
         json.dump(facts_data, f)
     print(f"[FACTS] Saved {len(facts_data.get('facts', []))} facts")
 
-# Load facts when server starts
 facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
@@ -135,9 +158,7 @@ def handle_fact_command(speaker_name, message):
     
     message_lower = message.lower()
     
-    # Check for "remember" command
     if "remember" in message_lower or "remind" in message_lower:
-        # Extract the fact (everything after the command word)
         for cmd in ["remember", "remind"]:
             if cmd in message_lower:
                 fact = message_lower.split(cmd, 1)[1].strip().rstrip(".!?")
@@ -151,11 +172,9 @@ def handle_fact_command(speaker_name, message):
             print(f"[FACT ADDED] {fact}")
             return f"Got it. I'll remember that. 📝"
     
-    # Check for "forget" command
     if "forget" in message_lower:
         fact = message_lower.split("forget", 1)[1].strip().rstrip(".!?")
         
-        # Find and remove matching fact
         for stored_fact in yaya_facts[:]:
             if fact.lower() in stored_fact.lower():
                 yaya_facts.remove(stored_fact)
@@ -166,7 +185,6 @@ def handle_fact_command(speaker_name, message):
         
         return f"I don't think I was remembering that anyway... 🤷‍♀️"
     
-    # Check for "what do you remember"
     if "what do you remember" in message_lower or "what do you know" in message_lower:
         if yaya_facts:
             facts_list = "\n".join([f"- {fact}" for fact in yaya_facts])
@@ -183,6 +201,11 @@ def handle_fact_command(speaker_name, message):
 def ask_yaya(user_message, speaker_name="Someone"):
     """Send a message to Yaya's brain and get her response."""
     
+    # Check rate limit
+    if not check_rate_limit():
+        print(f"[RATE LIMITED] Too many requests. Rejecting message from {speaker_name}")
+        return "Whoa whoa whoa! Too many people talking to me at once! Give me a second to catch up! 😤"
+    
     # Check for fact commands first
     fact_response = handle_fact_command(speaker_name, user_message)
     if fact_response:
@@ -192,7 +215,6 @@ def ask_yaya(user_message, speaker_name="Someone"):
     
     conversation_history.append({"role": "user", "content": f"{speaker_name} says: {user_message}"})
     
-    # Keep last 100 messages for longer memory
     if len(conversation_history) > 100:
         conversation_history.pop(0)
     
@@ -271,8 +293,9 @@ def ask_yaya_for_random_thought(nearby_names):
 
 @app.route("/", methods=["GET"])
 def home():
+    current_requests = len([t for t in request_times if time.time() - t < RATE_LIMIT_WINDOW])
     facts_count = len(yaya_facts)
-    return f"Yaya's brain is running! 🧠 Stored facts: {facts_count}. Endpoints: /chat (POST), /autonomous-smart (POST)"
+    return f"Yaya's brain is running! 🧠 Stored facts: {facts_count}. Recent requests: {current_requests}/{MAX_REQUESTS_PER_MINUTE}"
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -310,9 +333,10 @@ def autonomous_smart():
 
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" YAYA - BRATS CLUB (MEMORY EDITION)")
+    print(" YAYA - BRATS CLUB (RATE LIMITED EDITION)")
     print("="*50)
-    print(f"\n  Stored facts: {len(yaya_facts)}")
+    print(f"\n  Max requests/minute: {MAX_REQUESTS_PER_MINUTE}")
+    print(f"  Stored facts: {len(yaya_facts)}")
     print("  Facts auto-clear after 24 hours")
     print("  Chat history: 100 messages")
     print("\n  /chat (POST)              : Respond to name")
