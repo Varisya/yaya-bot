@@ -30,10 +30,8 @@ def check_rate_limit():
     global request_times
     current_time = time.time()
     
-    # Clean old entries
     request_times = [t for t in request_times if current_time - t < RATE_LIMIT_WINDOW]
     
-    # Check RPM
     if len(request_times) >= MAX_REQUESTS_PER_MINUTE:
         print(f"[RATE LIMIT] RPM: {len(request_times)}/{MAX_REQUESTS_PER_MINUTE}")
         return False
@@ -71,7 +69,7 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# SYSTEM PROMPT (LEAN)
+# SYSTEM PROMPT
 # ============================================
 
 def get_facts_text():
@@ -89,15 +87,16 @@ def get_system_prompt():
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
-Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like the club belongs to you 💋🔥
+Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like the club belongs to you. Always use emojis in every response — they're part of your personality 💋🔥💃✨
 
-Crush: Secret crush on Toojays/TT. With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗 sparingly. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
+Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT" or "Toojays / TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
 
 {facts_text}
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
 - Under 2 sentences, sharp and punchy.
+- ALWAYS include emojis in your response — at least one or two every time.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
@@ -191,19 +190,19 @@ def ask_yaya_for_random_thought(nearby_names):
     
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
-            "Say something bratty about the party. Emojis! One sentence.",
-            "Snarky observation about the club. Emojis. One sentence.",
-            "Hype up the dance floor. Emojis. One sentence.",
-            "Act like you own this place. Emojis. One sentence.",
-            "Complain the party isn't wild enough. Emojis. One sentence.",
+            "Say something bratty about the party. Use emojis! One sentence.",
+            "Snarky observation about the club. Use emojis. One sentence.",
+            "Hype up the dance floor. Use emojis. One sentence.",
+            "Act like you own this place. Use emojis. One sentence.",
+            "Complain the party isn't wild enough. Use emojis. One sentence.",
         ]
         prompt = random.choice(prompts)
     else:
         chosen_name = random.choice(nearby_names)
         if is_tt(chosen_name):
-            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Heart emojis. One sentence. No ALL CAPS. No pet names."
+            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Use heart emojis 💕💖💗. One sentence. No ALL CAPS. No pet names. Call her TT or Toojays — never 'Toojays/TT'."
         else:
-            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Emojis. One sentence."
+            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use emojis. One sentence."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
