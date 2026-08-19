@@ -187,10 +187,16 @@ def ask_yaya(user_message, speaker_name="Someone"):
         print("[GROQ] Sending request...")
         response = client.chat.completions.create(
             messages=messages,
-            model="openai/gpt-oss-20b",
-            max_tokens=150
+            model="openai/gpt-oss-20b"
         )
+        
         yaya_reply = response.choices[0].message.content
+        
+        # Check if reply is empty or None
+        if not yaya_reply or yaya_reply.strip() == "":
+            print("[GROQ] Empty response received")
+            yaya_reply = "Ugh, my brain just went blank. Try again! 🤪"
+        
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         print(f"[GROQ] Success: {yaya_reply}")
         return yaya_reply
@@ -235,10 +241,15 @@ def ask_yaya_for_random_thought(nearby_names):
         print("[GROQ] Sending random thought request...")
         response = client.chat.completions.create(
             messages=messages,
-            model="openai/gpt-oss-20b",
-            max_tokens=150
+            model="openai/gpt-oss-20b"
         )
+        
         yaya_reply = response.choices[0].message.content
+        
+        if not yaya_reply or yaya_reply.strip() == "":
+            print("[GROQ] Empty random thought response")
+            yaya_reply = "The party is great and so am I! 💅✨"
+        
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         print(f"[GROQ] Random thought: {yaya_reply}")
         return yaya_reply
