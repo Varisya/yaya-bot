@@ -187,7 +187,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
         print("[GROQ] Sending request...")
         response = client.chat.completions.create(
             messages=messages,
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             max_tokens=150
         )
         yaya_reply = response.choices[0].message.content
@@ -202,7 +202,6 @@ def ask_yaya(user_message, speaker_name="Someone"):
         print(f"[GROQ ERROR] Message: {error_msg}")
         print(f"[GROQ ERROR] Full: {repr(e)}")
         
-        # Return specific error message so we can see it in-world
         return f"Ugh, brain freeze. {error_type} 🤪"
 
 
@@ -236,7 +235,7 @@ def ask_yaya_for_random_thought(nearby_names):
         print("[GROQ] Sending random thought request...")
         response = client.chat.completions.create(
             messages=messages,
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             max_tokens=150
         )
         yaya_reply = response.choices[0].message.content
@@ -292,6 +291,7 @@ if __name__ == "__main__":
     print("="*50)
     print(f"  Groq API Key set: {bool(GROQ_API_KEY)}")
     print(f"  API Key starts with: {GROQ_API_KEY[:10] if GROQ_API_KEY else 'NONE'}...")
+    print(f"  Model: openai/gpt-oss-20b")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
     print(f"  Facts: {len(yaya_facts)}")
