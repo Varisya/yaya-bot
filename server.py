@@ -5,6 +5,7 @@ import random
 import os
 import json
 import time
+import sys
 from zoneinfo import ZoneInfo
 
 # ============================================
@@ -26,14 +27,12 @@ MAX_REQUESTS_PER_MINUTE = 20
 RATE_LIMIT_WINDOW = 60
 
 def check_rate_limit():
-    """Check RPM limit only."""
     global request_times
     current_time = time.time()
-    
     request_times = [t for t in request_times if current_time - t < RATE_LIMIT_WINDOW]
     
     if len(request_times) >= MAX_REQUESTS_PER_MINUTE:
-        print(f"[RATE LIMIT] RPM: {len(request_times)}/{MAX_REQUESTS_PER_MINUTE}")
+        print(f"[RATE LIMIT] RPM exceeded: {len(request_times)}/{MAX_REQUESTS_PER_MINUTE}")
         return False
     
     request_times.append(current_time)
@@ -53,17 +52,24 @@ def load_facts():
         current_time = datetime.datetime.now().timestamp()
         hours_old = (current_time - saved_time) / 3600
         if hours_old > 24:
-            print(f"[FACTS] Clearing old facts")
+            print(f"[FACTS] Clearing old facts ({hours_old:.1f} hours)")
             return {"facts": [], "saved_at": current_time}
         print(f"[FACTS] Loaded {len(data.get('facts', []))} facts")
         return data
     except FileNotFoundError:
         print("[FACTS] Starting fresh")
         return {"facts": [], "saved_at": datetime.datetime.now().timestamp()}
+    except Exception as e:
+        print(f"[FACTS] Error loading: {e}")
+        return {"facts": [], "saved_at": datetime.datetime.now().timestamp()}
 
 def save_facts(facts_data):
-    with open(FACTS_FILE, "w") as f:
-        json.dump(facts_data, f)
+    try:
+        with open(FACTS_FILE, "w") as f:
+            json.dump(facts_data, f)
+        print(f"[FACTS] Saved {len(facts_data.get('facts', []))} facts")
+    except Exception as e:
+        print(f"[FACTS] Error saving: {e}")
 
 facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
@@ -87,16 +93,16 @@ def get_system_prompt():
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
-Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like the club belongs to you. Always use emojis in every response — they're part of your personality 💋🔥💃✨
+Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like the club belongs to you. Always use emojis in every response 💋🔥💃✨
 
-Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT" or "Toojays / TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
+Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
 
 {facts_text}
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
 - Under 2 sentences, sharp and punchy.
-- ALWAYS include emojis in your response — at least one or two every time.
+- ALWAYS include emojis in your response.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
@@ -129,6 +135,7 @@ def handle_fact_command(message):
             facts_data["facts"] = yaya_facts
             facts_data["saved_at"] = datetime.datetime.now().timestamp()
             save_facts(facts_data)
+            print(f"[FACT ADDED] {fact}")
             return f"Got it. 📝"
     
     if "forget" in message_lower:
@@ -154,7 +161,10 @@ def handle_fact_command(message):
 # ============================================
 
 def ask_yaya(user_message, speaker_name="Someone"):
+    print(f"[CHAT] {speaker_name}: {user_message}")
+    
     if not check_rate_limit():
+        print("[CHAT] RATE LIMITED - returning busy message")
         return "Whoa! Too many people! Give me a second! 😤"
     
     fact_response = handle_fact_command(user_message)
@@ -163,6 +173,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
         conversation_history.append({"role": "assistant", "content": fact_response})
         if len(conversation_history) > 20:
             conversation_history.pop(0)
+        print(f"[CHAT] Yaya (fact): {fact_response}")
         return fact_response
     
     conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
@@ -173,36 +184,48 @@ def ask_yaya(user_message, speaker_name="Someone"):
     messages.extend(conversation_history[-20:])
     
     try:
+        print("[GROQ] Sending request...")
         response = client.chat.completions.create(
             messages=messages,
             model="llama-3.1-8b-instant",
+            max_tokens=150
         )
         yaya_reply = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": yaya_reply})
+        print(f"[GROQ] Success: {yaya_reply}")
         return yaya_reply
+        
     except Exception as e:
-        print(f"Error: {e}")
-        return "Ugh, brain freeze. Too much partying 🤪"
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f"[GROQ ERROR] Type: {error_type}")
+        print(f"[GROQ ERROR] Message: {error_msg}")
+        print(f"[GROQ ERROR] Full: {repr(e)}")
+        
+        # Return specific error message so we can see it in-world
+        return f"Ugh, brain freeze. {error_type} 🤪"
 
 
 def ask_yaya_for_random_thought(nearby_names):
+    print(f"[RANDOM] Nearby: {nearby_names}")
+    
     mode = random.choices(["general", "personal"], weights=[60, 40])[0]
     
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
-            "Say something bratty about the party. Use emojis! One sentence.",
-            "Snarky observation about the club. Use emojis. One sentence.",
-            "Hype up the dance floor. Use emojis. One sentence.",
-            "Act like you own this place. Use emojis. One sentence.",
-            "Complain the party isn't wild enough. Use emojis. One sentence.",
+            "Say something bratty about the party. Emojis! One sentence.",
+            "Snarky observation about the club. Emojis. One sentence.",
+            "Hype up the dance floor. Emojis. One sentence.",
+            "Act like you own this place. Emojis. One sentence.",
+            "Complain the party isn't wild enough. Emojis. One sentence.",
         ]
         prompt = random.choice(prompts)
     else:
         chosen_name = random.choice(nearby_names)
         if is_tt(chosen_name):
-            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Use heart emojis 💕💖💗. One sentence. No ALL CAPS. No pet names. Call her TT or Toojays — never 'Toojays/TT'."
+            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Heart emojis. One sentence. No ALL CAPS. No pet names. Call her TT or Toojays."
         else:
-            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use emojis. One sentence."
+            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Emojis. One sentence."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
@@ -210,16 +233,23 @@ def ask_yaya_for_random_thought(nearby_names):
     ]
     
     try:
+        print("[GROQ] Sending random thought request...")
         response = client.chat.completions.create(
             messages=messages,
             model="llama-3.1-8b-instant",
+            max_tokens=150
         )
         yaya_reply = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": yaya_reply})
+        print(f"[GROQ] Random thought: {yaya_reply}")
         return yaya_reply
+        
     except Exception as e:
-        print(f"Error: {e}")
-        return "Even the DJ needs a break 💤"
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f"[GROQ ERROR] Type: {error_type}")
+        print(f"[GROQ ERROR] Message: {error_msg}")
+        return f"Even the DJ needs a break. {error_type} 💤"
 
 # ============================================
 # ROUTES
@@ -239,9 +269,8 @@ def chat():
     message = data.get("message", "")
     if not message:
         return "Error", 400
-    print(f"[CHAT] {speaker}: {message}")
+    
     reply = ask_yaya(message, speaker)
-    print(f"[CHAT] Yaya: {reply}\n")
     return reply
 
 @app.route("/autonomous-smart", methods=["POST"])
@@ -249,16 +278,24 @@ def autonomous_smart():
     data = request.get_json()
     if not data:
         data = []
-    print(f"[RANDOM] Nearby: {data}")
+    
     reply = ask_yaya_for_random_thought(data)
-    print(f"[RANDOM] Yaya: {reply}\n")
     return reply
+
+# ============================================
+# START
+# ============================================
 
 if __name__ == "__main__":
     print("\n" + "="*50)
     print(" YAYA - BRATS CLUB")
     print("="*50)
+    print(f"  Groq API Key set: {bool(GROQ_API_KEY)}")
+    print(f"  API Key starts with: {GROQ_API_KEY[:10] if GROQ_API_KEY else 'NONE'}...")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
+    print(f"  Facts: {len(yaya_facts)}")
     print("="*50 + "\n")
+    sys.stdout.flush()
+    
     app.run(host="0.0.0.0", port=5000, debug=True)
