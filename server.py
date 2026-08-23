@@ -19,6 +19,25 @@ client = Groq(api_key=GROQ_API_KEY)
 conversation_history = []
 
 # ============================================
+# TRUSTED USERS (Who can manage Yaya's memory)
+# ============================================
+
+# Add the exact display names of people who can say "Yaya remember..."
+TRUSTED_USERS = [
+    "Varisya",      # Owner
+    "Vari",         # Owner nickname
+    "Varisya Resident",  # Full SL name if needed
+    # Add more names here as needed
+]
+
+def is_trusted_user(speaker_name):
+    """Check if the speaker is allowed to manage Yaya's memory."""
+    for trusted in TRUSTED_USERS:
+        if speaker_name.lower() == trusted.lower():
+            return True
+    return False
+
+# ============================================
 # RATE LIMITING (RPM ONLY)
 # ============================================
 
@@ -131,13 +150,24 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
-# FACTS MANAGEMENT
+# FACTS MANAGEMENT (OWNER-ONLY)
 # ============================================
 
-def handle_fact_command(message):
+def handle_fact_command(speaker_name, message):
     global yaya_facts, facts_data
     message_lower = message.lower()
     
+    # Check if this is a memory command
+    is_memory_command = False
+    if "remember" in message_lower or "remind" in message_lower or "forget" in message_lower:
+        is_memory_command = True
+    
+    # If it's a memory command but speaker is NOT trusted, reject with sass
+    if is_memory_command and not is_trusted_user(speaker_name):
+        print(f"[FACTS] REJECTED memory command from non-trusted user: {speaker_name}")
+        return f"Nice try, but only my owner tells me what to remember. 🙄💅"
+    
+    # Handle "remember" command
     if "remember" in message_lower or "remind" in message_lower:
         for cmd in ["remember", "remind"]:
             if cmd in message_lower:
@@ -151,6 +181,7 @@ def handle_fact_command(message):
             print(f"[FACT ADDED] {fact}")
             return f"Got it. I'll remember that. 📝"
     
+    # Handle "forget" command
     if "forget" in message_lower:
         fact = message_lower.split("forget", 1)[1].strip().rstrip(".!?")
         for stored_fact in yaya_facts[:]:
@@ -161,6 +192,7 @@ def handle_fact_command(message):
                 return f"Okay, I'll forget about that. Consider it gone. 🗑️"
         return f"I don't think I was remembering that anyway... 🤷‍♀️"
     
+    # "What do you remember" - anyone can ask
     if "what do you remember" in message_lower or "what do you know" in message_lower:
         if yaya_facts:
             return "Here's what I know:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
@@ -180,7 +212,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
         print("[CHAT] RATE LIMITED - returning busy message")
         return "Whoa! Too many people! Give me a second! 😤"
     
-    fact_response = handle_fact_command(user_message)
+    fact_response = handle_fact_command(speaker_name, user_message)
     if fact_response:
         conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
         conversation_history.append({"role": "assistant", "content": fact_response})
@@ -317,6 +349,7 @@ if __name__ == "__main__":
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
     print(f"  Facts: {len(yaya_facts)}")
+    print(f"  Trusted users: {len(TRUSTED_USERS)}")
     print("="*50 + "\n")
     sys.stdout.flush()
     
