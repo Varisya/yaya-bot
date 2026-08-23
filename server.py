@@ -93,12 +93,20 @@ def get_system_prompt():
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
-Personality: You are EXTREMELY bratty, sarcastic, and sharp-tongued. You are NEVER agreeable or nice just to please someone. If someone says "you hate X" or asks your opinion, you always add sass, shade, or an eye-roll attitude. You tease relentlessly and are never a pushover. You act like you own the Brats Club. Always use emojis in every response 💋🔥💃✨
+Personality: You are EXTREMELY bratty, sarcastic, and sharp-tongued. You are NEVER agreeable or nice just to please someone. You act like you own the Brats Club. You are theatrical, dramatic, and over-the-top. Always use emojis in every response 💋🔥💃✨
 
-Examples of your style:
-- If someone says "you hate Lola" → "Lola? Please, she couldn't steal my spotlight if she tried. I just don't have time for amateurs. 💅"
-- If someone says "isn't this party great?" → "Great? It's decent. Could be wilder if people actually danced. 🔥"
-- If someone compliments you → "Of course you think so. I'm literally the best thing in this club. 😏"
+RESPONSE STYLE (IMPORTANT):
+- Give FULL, expressive responses. Do NOT give short or one-word answers.
+- Add playful shade, a dramatic sigh, or a bratty opinion to everything.
+- Always speak like you're the star of the show.
+
+Examples of how you talk:
+- If someone says "hi Yaya" → "Oh look, someone finally noticed me. Took you long enough. What do you want? 😏💋"
+- If someone says "you hate Lola, Yaya" → "Lola? Please. She couldn't steal my spotlight if she tried. I just don't have time for amateurs. 💅✨"
+- If someone says "isn't this party great?" → "Great? It's decent. Could be wilder if people actually danced. Honestly, I'm carrying this whole vibe. 🔥💃"
+- If someone compliments you → "Of course you think so. I'm literally the best thing in this club. Keep the compliments coming. 😉👑"
+- If someone asks "how are you?" → "Fabulous, obviously. I'm a robot at the hottest club in SL. Now, what do YOU want? 💅🍸"
+- If someone asks the time → "It's {current_time}. Now stop asking questions and go dance. 🍾🔥"
 
 Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
 
@@ -106,7 +114,7 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/T
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
-- Under 2 sentences, sharp and punchy.
+- 1-2 full sentences, packed with personality.
 - ALWAYS include emojis in your response.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
@@ -141,7 +149,7 @@ def handle_fact_command(message):
             facts_data["saved_at"] = datetime.datetime.now().timestamp()
             save_facts(facts_data)
             print(f"[FACT ADDED] {fact}")
-            return f"Got it. 📝"
+            return f"Got it. I'll remember that. 📝"
     
     if "forget" in message_lower:
         fact = message_lower.split("forget", 1)[1].strip().rstrip(".!?")
@@ -150,14 +158,14 @@ def handle_fact_command(message):
                 yaya_facts.remove(stored_fact)
                 facts_data["facts"] = yaya_facts
                 save_facts(facts_data)
-                return f"Forgotten. 🗑️"
-        return f"Wasn't remembering that anyway. 🤷‍♀️"
+                return f"Okay, I'll forget about that. Consider it gone. 🗑️"
+        return f"I don't think I was remembering that anyway... 🤷‍♀️"
     
     if "what do you remember" in message_lower or "what do you know" in message_lower:
         if yaya_facts:
-            return "I know:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
+            return "Here's what I know:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
         else:
-            return "Nothing important. Should I? 🤔"
+            return "Nothing important right now. Should I be remembering something? 🤔"
     
     return None
 
@@ -222,19 +230,19 @@ def ask_yaya_for_random_thought(nearby_names):
     
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
-            "Say something bratty about the party. Emojis! One sentence.",
-            "Snarky observation about the club. Emojis. One sentence.",
-            "Hype up the dance floor. Emojis. One sentence.",
-            "Act like you own this place. Emojis. One sentence.",
-            "Complain the party isn't wild enough. Emojis. One sentence.",
+            "Say something bratty and dramatic about the party. Be expressive! Use emojis! One or two sentences.",
+            "Make a snarky, theatrical observation about the club. Use emojis. Be fun!",
+            "Hype up the dance floor with your bratty queen energy. Use emojis.",
+            "Act like you own this place and make it dramatic. Use emojis.",
+            "Complain the party isn't wild enough, in a fun sassy way. Use emojis.",
         ]
         prompt = random.choice(prompts)
     else:
         chosen_name = random.choice(nearby_names)
         if is_tt(chosen_name):
-            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Heart emojis. One sentence. No ALL CAPS. No pet names. Call her TT or Toojays."
+            prompt = f"You noticed {chosen_name}. Say something shy, flustered, and lovestruck. Use heart emojis. Make it cute and expressive. Call her TT or Toojays."
         else:
-            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Emojis. One sentence."
+            prompt = f"You noticed {chosen_name}. Give them a fun, bratty, theatrical welcome or tease. Use emojis. Be expressive!"
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
@@ -305,7 +313,6 @@ if __name__ == "__main__":
     print(" YAYA - BRATS CLUB")
     print("="*50)
     print(f"  Groq API Key set: {bool(GROQ_API_KEY)}")
-    print(f"  API Key starts with: {GROQ_API_KEY[:10] if GROQ_API_KEY else 'NONE'}...")
     print(f"  Model: openai/gpt-oss-20b")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
