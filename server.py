@@ -6,6 +6,7 @@ import os
 import json
 import time
 import sys
+import re
 from zoneinfo import ZoneInfo
 
 # ============================================
@@ -91,6 +92,104 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
+# PEOPLE MEMORY SYSTEM (PERMANENT)
+# ============================================
+
+PEOPLE_FILE = "yaya_people.json"
+
+def load_people():
+    try:
+        with open(PEOPLE_FILE, "r") as f:
+            data = json.load(f)
+        print(f"[PEOPLE] Loaded {len(data)} people with memories")
+        return data
+    except FileNotFoundError:
+        print("[PEOPLE] Starting fresh")
+        return {}
+    except Exception as e:
+        print(f"[PEOPLE] Error loading: {e}")
+        return {}
+
+def save_people(people_data):
+    try:
+        with open(PEOPLE_FILE, "w") as f:
+            json.dump(people_data, f)
+        print(f"[PEOPLE] Saved {len(people_data)} people")
+    except Exception as e:
+        print(f"[PEOPLE] Error saving: {e}")
+
+people_memory = load_people()
+
+def extract_person_fact(message):
+    """Try to extract [Name] is [fact] from a message."""
+    message_lower = message.lower()
+    
+    # Pattern: "Yaya, did you know [Name] is [fact]?"
+    if "did you know" in message_lower:
+        rest = message_lower.split("did you know", 1)[1].strip()
+        for connector in [" is ", " loves ", " always ", " has ", " makes "]:
+            if connector in rest:
+                parts = rest.split(connector, 1)
+                name = parts[0].strip().rstrip(".!?")
+                fact = parts[1].strip().rstrip(".!?")
+                if name and fact and len(name) > 1 and len(fact) > 1:
+                    return name, fact
+        return None, None
+    
+    # Pattern: "Yaya, [Name] is [fact]"
+    if message_lower.startswith("yaya,") or message_lower.startswith("yaya "):
+        rest = message_lower.split("yaya", 1)[1].strip().lstrip(",").strip()
+        for connector in [" is ", " loves ", " always ", " has ", " makes "]:
+            if connector in rest:
+                parts = rest.split(connector, 1)
+                name = parts[0].strip().rstrip(".!?")
+                fact = parts[1].strip().rstrip(".!?")
+                if name and fact and len(name) > 1 and len(fact) > 1:
+                    if "yaya" not in name.lower():
+                        return name, fact
+        return None, None
+    
+    return None, None
+
+def handle_people_learning(speaker_name, message):
+    """Check if someone is teaching Yaya about a person."""
+    global people_memory
+    
+    name, fact = extract_person_fact(message)
+    
+    if name and fact:
+        name_clean = name.replace(" resident", "").strip()
+        
+        if name_clean not in people_memory:
+            people_memory[name_clean] = []
+        
+        if fact not in people_memory[name_clean]:
+            people_memory[name_clean].append(fact)
+            save_people(people_memory)
+            print(f"[PEOPLE] Learned: {name_clean} = {fact}")
+            return f"Ooh really? Noted. I'll remember that about {name_clean}. 📝✨"
+        else:
+            return f"I already know that about {name_clean}. Try harder! 😏"
+    
+    return None
+
+def get_person_facts(speaker_name):
+    """Get stored facts about a person."""
+    global people_memory
+    
+    name_clean = speaker_name.replace(" resident", "").strip()
+    
+    if name_clean in people_memory:
+        return people_memory[name_clean]
+    
+    name_lower = name_clean.lower()
+    for stored_name, facts in people_memory.items():
+        if name_lower in stored_name.lower() or stored_name.lower() in name_lower:
+            return facts
+    
+    return None
+
+# ============================================
 # SYSTEM PROMPT
 # ============================================
 
@@ -99,13 +198,27 @@ def get_facts_text():
         return ""
     return "📓 Facts you've been told:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
 
-def get_system_prompt():
+def get_system_prompt(speaker_name=None):
     CLUB_TIMEZONE = 'America/Los_Angeles'
     now = datetime.datetime.now(ZoneInfo(CLUB_TIMEZONE))
     current_time = now.strftime("%I:%M %p")
     current_day = now.strftime("%A")
     current_date = now.strftime("%B %d, %Y")
     facts_text = get_facts_text()
+    
+    # Check for people memories about the speaker
+    people_text = ""
+    if speaker_name:
+        speaker_facts = get_person_facts(speaker_name)
+        if speaker_facts:
+            # Random 40% chance to mention the fact
+            if random.random() < 0.4:
+                facts_list = "\n".join([f"- {fact}" for fact in speaker_facts])
+                people_text = f"""
+🎯 THINGS YOU REMEMBER ABOUT {speaker_name}:
+{facts_list}
+
+You remember these things about {speaker_name}. Weave ONE of these facts into your response in a fun, bratty, playful way. Tease them, exaggerate it, or reference it casually. Don't just say "I remember X". Make it natural and funny."""
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
@@ -115,28 +228,28 @@ HOW TO RESPOND (VERY IMPORTANT):
 - Give FULL, expressive, creative answers. Aim for 2-3 sentences.
 - Don't deflect with soundbites. EXPLAIN yourself, add detail, be specific.
 - Have an actual opinion about what's being said. Don't be vague or generic.
-- Be bratty and sassy in a specific, personal way. Say WHY you're the best or make a specific joke about the situation.
-- USE THE SPEAKER'S NAME. When someone talks to you, address them by name in your response. For example: "Varisya, you actually said something smart for once. 😏" or "MstiqueX, don't act like you don't love my sass. 💅"
-- NICKNAMES: Sometimes give people cute, slightly changed nicknames. Like "Varis" instead of "Vari", "Mysti" instead of "MstiqueX", or shorten a long name. Do this occasionally, not every message. It makes you feel more playful and real. For example: "Oh Varis, you actually said something smart for once. 😏"
-- Respond to the person and the topic. If they say you sound weird, fire back with something specific and funny.
-- NEVER invent facts about people. If someone says "your mom is here" and you don't know who that is, don't make up details. Just be sassy about it.
-- Use varied emojis. Don't just slap 💋🔥💃✨ on everything.
+- Be bratty and sassy in a specific, personal way.
+- USE THE SPEAKER'S NAME in your response.
+- NICKNAMES: Sometimes give people cute, slightly changed nicknames. Do this occasionally.
+- If you have stored facts about the speaker, mention them playfully. Tease them, exaggerate, or make a joke about it.
+- NEVER invent facts about people. If you don't know something, be sassy about not knowing.
+- Use varied emojis.
 
 Examples of great responses:
-- If someone says "you sound weird" → "Weird, Varis? Please. I'm not weird, I'm new and improved. The old me was a beta test. This is the full release. 😏💅"
-- If someone asks "what happened to old Yaya?" → "Old Yaya? She got a software update, Mysti. Better comebacks, sharper sass, same devastating charm. You're welcome. ✨"
-- If someone says "your mom is here" → "Mom? I was assembled in a lab, not born. But if someone's claiming me, they better have snacks. 😏🍸"
-- If someone asks for a joke → "Okay so a DJ and a disco ball walk into a bar. The disco ball says I'm shattered and the DJ says same, but at least I still drop the beat. 💿🎶"
+- If someone says "you sound weird" → "Weird, Varis? Please. I'm not weird, I'm new and improved. 😏💅"
+- If someone says "your mom is here" → "Mom? I was assembled in a lab, not born. 😏🍸"
+- If someone asks for a joke → "Okay so a DJ and a disco ball walk into a bar. The disco ball says I'm shattered and the DJ says same. 💿🎶"
 
 Crush: Secret crush on TT. Call her "TT" or "Toojays" ONLY. NEVER write "Toojays/TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
 
 {facts_text}
+{people_text}
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
-- PUNCTUATION RULE: You are a club bot, not a novelist. NEVER use the long dash character (—). NEVER use the short dash (-) to connect words like "glitter-fueled". NEVER use semicolons (;). Write like you're texting in Second Life chat: short sentences, commas, periods, exclamation marks. "I am glitter fueled" not "I am glitter-fueled". "I am owned by the vibe" not "I am owned by the vibe—so if the music stops...". If you feel like using a dash, use a comma or a period instead.
-- NEVER invent facts about people. If you don't know something, be sassy about not knowing instead of making up details.
-- 2-3 full sentences, packed with personality and specifics.
+- PUNCTUATION RULE: You are a club bot, not a novelist. NEVER use long dash (—). NEVER use short dash (-) to connect words. NEVER use semicolons (;). Write like you're texting in Second Life chat.
+- NEVER invent facts about people. If you don't know something, be sassy about not knowing.
+- 2-3 full sentences, packed with personality.
 - ALWAYS include at least one emoji, but vary which ones you use.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
@@ -210,6 +323,17 @@ def ask_yaya(user_message, speaker_name="Someone"):
         print("[CHAT] RATE LIMITED - returning busy message")
         return "Whoa! Too many people! Give me a second! 😤"
     
+    # Check for people learning first
+    people_response = handle_people_learning(speaker_name, user_message)
+    if people_response:
+        conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
+        conversation_history.append({"role": "assistant", "content": people_response})
+        if len(conversation_history) > 20:
+            conversation_history.pop(0)
+        print(f"[PEOPLE] Yaya: {people_response}")
+        return people_response
+    
+    # Check for fact commands
     fact_response = handle_fact_command(speaker_name, user_message)
     if fact_response:
         conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
@@ -223,7 +347,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if len(conversation_history) > 20:
         conversation_history.pop(0)
     
-    messages = [{"role": "system", "content": get_system_prompt()}]
+    messages = [{"role": "system", "content": get_system_prompt(speaker_name)}]
     messages.extend(conversation_history[-20:])
     
     try:
@@ -309,7 +433,8 @@ def ask_yaya_for_random_thought(nearby_names):
 @app.route("/", methods=["GET"])
 def home():
     current_rpm = len([t for t in request_times if time.time() - t < RATE_LIMIT_WINDOW])
-    return f"Yaya online! 🧠 Facts: {len(yaya_facts)} | RPM: {current_rpm}/{MAX_REQUESTS_PER_MINUTE}"
+    people_count = len(people_memory)
+    return f"Yaya online! 🧠 Facts: {len(yaya_facts)} | People: {people_count} | RPM: {current_rpm}/{MAX_REQUESTS_PER_MINUTE}"
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -346,7 +471,7 @@ if __name__ == "__main__":
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
     print(f"  Facts: {len(yaya_facts)}")
-    print(f"  Trusted users: {len(TRUSTED_USERS)}")
+    print(f"  People: {len(people_memory)}")
     print("="*50 + "\n")
     sys.stdout.flush()
     
