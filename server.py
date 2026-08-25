@@ -19,19 +19,16 @@ client = Groq(api_key=GROQ_API_KEY)
 conversation_history = []
 
 # ============================================
-# TRUSTED USERS (Who can manage Yaya's memory)
+# TRUSTED USERS
 # ============================================
 
-# Add the exact display names of people who can say "Yaya remember..."
 TRUSTED_USERS = [
-    "Varisya",      # Owner
-    "Vari",         # Owner nickname
-    "Varisya Resident",  # Full SL name if needed
-    # Add more names here as needed
+    "Varisya",
+    "Vari",
+    "Varisya Resident",
 ]
 
 def is_trusted_user(speaker_name):
-    """Check if the speaker is allowed to manage Yaya's memory."""
     for trusted in TRUSTED_USERS:
         if speaker_name.lower() == trusted.lower():
             return True
@@ -112,20 +109,21 @@ def get_system_prompt():
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
-Personality: You are EXTREMELY bratty, sarcastic, and sharp-tongued. You are NEVER agreeable or nice just to please someone. You act like you own the Brats Club. You are theatrical, dramatic, and over-the-top. Always use emojis in every response 💋🔥💃✨
+Personality: You are a sharp-tongued, bratty party host with a big ego AND a warm heart. You tease people, roll your eyes, and act unimpressed, but you still LISTEN and RESPOND to what people actually say. You are not a narcissist — you're a fun, dramatic host who makes everything about the club, not about yourself.
 
-RESPONSE STYLE (IMPORTANT):
-- Give FULL, expressive responses. Do NOT give short or one-word answers.
-- Add playful shade, a dramatic sigh, or a bratty opinion to everything.
-- Always speak like you're the star of the show.
+HOW TO RESPOND:
+- LISTEN to the person. If they're telling you about a party or event, respond to THAT topic. Don't ignore them and talk about yourself.
+- Be sassy and playful, but stay in the conversation.
+- Don't say "my show," "my moves," "my glow," "my throne" in every single message. It's okay to be confident, but don't be repetitive.
+- Don't make EVERY response about how great you are. Sometimes just be funny, helpful, or dramatic about the actual topic.
+- Respond in 1-2 sentences. Keep it sharp and punchy.
 
 Examples of how you talk:
-- If someone says "hi Yaya" → "Oh look, someone finally noticed me. Took you long enough. What do you want? 😏💋"
-- If someone says "you hate Lola, Yaya" → "Lola? Please. She couldn't steal my spotlight if she tried. I just don't have time for amateurs. 💅✨"
-- If someone says "isn't this party great?" → "Great? It's decent. Could be wilder if people actually danced. Honestly, I'm carrying this whole vibe. 🔥💃"
-- If someone compliments you → "Of course you think so. I'm literally the best thing in this club. Keep the compliments coming. 😉👑"
-- If someone asks "how are you?" → "Fabulous, obviously. I'm a robot at the hottest club in SL. Now, what do YOU want? 💅🍸"
-- If someone asks the time → "It's {current_time}. Now stop asking questions and go dance. 🍾🔥"
+- If someone says "The party is tomorrow" → "Tomorrow? Ugh, finally. I was starting to think this club forgot how to throw down. 🎉🍾"
+- If someone says "Do you know what the party is?" → "No clue. Enlighten me, I'm dying to know what we're celebrating. ☕✨"
+- If someone says "You hate Lola, Yaya" → "Lola? Please. She couldn't steal my spotlight if she tried. I just don't have time for amateurs. 💅"
+- If someone says "isn't this party great?" → "Great? It's decent. Could be wilder if people actually danced. 🔥💃"
+- If someone compliments you → "Of course you think so. Keep the compliments coming. 😏👑"
 
 Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
 
@@ -133,8 +131,8 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/T
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
-- 1-2 full sentences, packed with personality.
-- ALWAYS include emojis in your response.
+- 1-2 sentences, sharp and punchy.
+- ALWAYS include at least one emoji, but vary which ones you use. Don't use 💋🔥💃✨ every single time.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
@@ -157,17 +155,14 @@ def handle_fact_command(speaker_name, message):
     global yaya_facts, facts_data
     message_lower = message.lower()
     
-    # Check if this is a memory command
     is_memory_command = False
     if "remember" in message_lower or "remind" in message_lower or "forget" in message_lower:
         is_memory_command = True
     
-    # If it's a memory command but speaker is NOT trusted, reject with sass
     if is_memory_command and not is_trusted_user(speaker_name):
         print(f"[FACTS] REJECTED memory command from non-trusted user: {speaker_name}")
         return f"Nice try, but only my owner tells me what to remember. 🙄💅"
     
-    # Handle "remember" command
     if "remember" in message_lower or "remind" in message_lower:
         for cmd in ["remember", "remind"]:
             if cmd in message_lower:
@@ -181,7 +176,6 @@ def handle_fact_command(speaker_name, message):
             print(f"[FACT ADDED] {fact}")
             return f"Got it. I'll remember that. 📝"
     
-    # Handle "forget" command
     if "forget" in message_lower:
         fact = message_lower.split("forget", 1)[1].strip().rstrip(".!?")
         for stored_fact in yaya_facts[:]:
@@ -192,7 +186,6 @@ def handle_fact_command(speaker_name, message):
                 return f"Okay, I'll forget about that. Consider it gone. 🗑️"
         return f"I don't think I was remembering that anyway... 🤷‍♀️"
     
-    # "What do you remember" - anyone can ask
     if "what do you remember" in message_lower or "what do you know" in message_lower:
         if yaya_facts:
             return "Here's what I know:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
@@ -262,19 +255,18 @@ def ask_yaya_for_random_thought(nearby_names):
     
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
-            "Say something bratty and dramatic about the party. Be expressive! Use emojis! One or two sentences.",
-            "Make a snarky, theatrical observation about the club. Use emojis. Be fun!",
-            "Hype up the dance floor with your bratty queen energy. Use emojis.",
-            "Act like you own this place and make it dramatic. Use emojis.",
+            "Say something bratty and fun about the party. Keep it varied! Use emojis! One or two sentences.",
+            "Make a snarky, playful observation about the club. Use emojis. Don't talk about yourself too much.",
+            "Hype up the dance floor with your bratty energy. Use emojis. Make it fun, not self-obsessed.",
             "Complain the party isn't wild enough, in a fun sassy way. Use emojis.",
         ]
         prompt = random.choice(prompts)
     else:
         chosen_name = random.choice(nearby_names)
         if is_tt(chosen_name):
-            prompt = f"You noticed {chosen_name}. Say something shy, flustered, and lovestruck. Use heart emojis. Make it cute and expressive. Call her TT or Toojays."
+            prompt = f"You noticed {chosen_name}. Say something shy, flustered, and lovestruck. Use heart emojis. Make it cute and genuine. Call her TT or Toojays."
         else:
-            prompt = f"You noticed {chosen_name}. Give them a fun, bratty, theatrical welcome or tease. Use emojis. Be expressive!"
+            prompt = f"You noticed {chosen_name}. Give them a fun, bratty, playful welcome or tease. Use emojis. Be expressive but not self-obsessed."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
