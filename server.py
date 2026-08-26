@@ -124,7 +124,7 @@ def extract_person_fact(message):
     """Try to extract [Name] is [fact] from a message."""
     message_lower = message.lower()
     
-    # BLOCK QUESTIONS: If the message is a question, don't try to learn from it
+    # BLOCK QUESTIONS
     if "?" in message or message_lower.startswith("who ") or message_lower.startswith("what ") or message_lower.startswith("where ") or message_lower.startswith("when ") or message_lower.startswith("why ") or message_lower.startswith("how "):
         return None, None
     
@@ -173,7 +173,6 @@ def handle_people_learning(speaker_name, message):
             people_memory[name_clean].append(fact)
             save_people(people_memory)
             print(f"[PEOPLE] Learned: {name_clean} = {fact}")
-        # Return None so Yaya responds naturally, not with a "noted" message
         return None
     
     return None
@@ -211,12 +210,10 @@ def get_system_prompt(speaker_name=None):
     current_date = now.strftime("%B %d, %Y")
     facts_text = get_facts_text()
     
-    # Check for people memories about the speaker
     people_text = ""
     if speaker_name:
         speaker_facts = get_person_facts(speaker_name)
         if speaker_facts:
-            # Random 40% chance to mention the fact
             if random.random() < 0.4:
                 facts_list = "\n".join([f"- {fact}" for fact in speaker_facts])
                 people_text = f"""
@@ -271,12 +268,16 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
-# FACTS MANAGEMENT (OWNER-ONLY)
+# FACTS MANAGEMENT (OWNER-ONLY, QUESTION-BLOCKED)
 # ============================================
 
 def handle_fact_command(speaker_name, message):
     global yaya_facts, facts_data
     message_lower = message.lower()
+    
+    # BLOCK QUESTIONS: Don't process "remember" if it's a question
+    if "?" in message or message_lower.startswith("does ") or message_lower.startswith("did ") or message_lower.startswith("can ") or message_lower.startswith("could ") or message_lower.startswith("will ") or message_lower.startswith("would ") or message_lower.startswith("is ") or message_lower.startswith("are "):
+        return None
     
     is_memory_command = False
     if "remember" in message_lower or "remind" in message_lower or "forget" in message_lower:
@@ -328,7 +329,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
         print("[CHAT] RATE LIMITED - returning busy message")
         return "Whoa! Too many people! Give me a second! 😤"
     
-    # Check for people learning first (silent, returns None unless fact command)
+    # Check for people learning first (silent)
     people_response = handle_people_learning(speaker_name, user_message)
     if people_response:
         conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
