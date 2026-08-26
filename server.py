@@ -124,6 +124,10 @@ def extract_person_fact(message):
     """Try to extract [Name] is [fact] from a message."""
     message_lower = message.lower()
     
+    # BLOCK QUESTIONS: If the message is a question, don't try to learn from it
+    if "?" in message or message_lower.startswith("who ") or message_lower.startswith("what ") or message_lower.startswith("where ") or message_lower.startswith("when ") or message_lower.startswith("why ") or message_lower.startswith("how "):
+        return None, None
+    
     # Pattern: "Yaya, did you know [Name] is [fact]?"
     if "did you know" in message_lower:
         rest = message_lower.split("did you know", 1)[1].strip()
@@ -133,7 +137,8 @@ def extract_person_fact(message):
                 name = parts[0].strip().rstrip(".!?")
                 fact = parts[1].strip().rstrip(".!?")
                 if name and fact and len(name) > 1 and len(fact) > 1:
-                    return name, fact
+                    if name not in ["who", "what", "where", "when", "why", "how"]:
+                        return name, fact
         return None, None
     
     # Pattern: "Yaya, [Name] is [fact]"
@@ -146,13 +151,14 @@ def extract_person_fact(message):
                 fact = parts[1].strip().rstrip(".!?")
                 if name and fact and len(name) > 1 and len(fact) > 1:
                     if "yaya" not in name.lower():
-                        return name, fact
+                        if name not in ["who", "what", "where", "when", "why", "how"]:
+                            return name, fact
         return None, None
     
     return None, None
 
 def handle_people_learning(speaker_name, message):
-    """Check if someone is teaching Yaya about a person."""
+    """Check if someone is teaching Yaya about a person. Silently stores the fact."""
     global people_memory
     
     name, fact = extract_person_fact(message)
@@ -167,9 +173,8 @@ def handle_people_learning(speaker_name, message):
             people_memory[name_clean].append(fact)
             save_people(people_memory)
             print(f"[PEOPLE] Learned: {name_clean} = {fact}")
-            return f"Ooh really? Noted. I'll remember that about {name_clean}. 📝✨"
-        else:
-            return f"I already know that about {name_clean}. Try harder! 😏"
+        # Return None so Yaya responds naturally, not with a "noted" message
+        return None
     
     return None
 
@@ -323,7 +328,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
         print("[CHAT] RATE LIMITED - returning busy message")
         return "Whoa! Too many people! Give me a second! 😤"
     
-    # Check for people learning first
+    # Check for people learning first (silent, returns None unless fact command)
     people_response = handle_people_learning(speaker_name, user_message)
     if people_response:
         conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
