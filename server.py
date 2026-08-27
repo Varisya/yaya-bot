@@ -1,5 +1,5 @@
 from flask import Flask, request
-import google.generativeai as genai
+from mistralai import Mistral
 import datetime
 import random
 import os
@@ -13,11 +13,8 @@ from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
-
-# Use Gemini Flash - current free model
-model = genai.GenerativeModel("gemini-2.5-flash")
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
+client = Mistral(api_key=MISTRAL_API_KEY)
 
 conversation_history = []
 
@@ -168,13 +165,17 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if len(conversation_history) > 20:
         conversation_history.pop(0)
     
-    # Build the prompt with conversation history
-    history_text = "\n".join([m["content"] for m in conversation_history[-20:]])
-    full_prompt = get_system_prompt() + "\n\nConversation so far:\n" + history_text
+    # Build messages for Mistral
+    messages = [{"role": "system", "content": get_system_prompt()}]
+    for msg in conversation_history[-20:]:
+        messages.append({"role": msg["role"], "content": msg["content"]})
     
     try:
-        response = model.generate_content(full_prompt)
-        yaya_reply = response.text
+        response = client.chat.complete(
+            model="mistral-small-latest",
+            messages=messages,
+        )
+        yaya_reply = response.choices[0].message.content
         if not yaya_reply or yaya_reply.strip() == "":
             yaya_reply = "Ugh, brain blank. Try again! 🤪"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -203,11 +204,17 @@ def ask_yaya_for_random_thought(nearby_names):
         else:
             prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use their name. Use varied emojis. One sentence."
     
-    full_prompt = get_system_prompt() + "\n\n" + prompt
+    messages = [
+        {"role": "system", "content": get_system_prompt()},
+        {"role": "user", "content": prompt}
+    ]
     
     try:
-        response = model.generate_content(full_prompt)
-        yaya_reply = response.text
+        response = client.chat.complete(
+            model="mistral-small-latest",
+            messages=messages,
+        )
+        yaya_reply = response.choices[0].message.content
         if not yaya_reply or yaya_reply.strip() == "":
             yaya_reply = "Party's lit and so am I! 💅✨"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -251,9 +258,9 @@ def autonomous_smart():
 
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" YAYA - BRATS CLUB (GEMINI)")
+    print(" YAYA - BRATS CLUB (MISTRAL)")
     print("="*50)
-    print(f"  Model: gemini-2.5-flash")
+    print(f"  Model: mistral-small-latest")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print("="*50 + "\n")
     app.run(host="0.0.0.0", port=5000, debug=True)
