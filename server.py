@@ -61,15 +61,22 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# SIMPLE CLEANER - TAKE AFTER </think>
+# CLEAN RESPONSE
 # ============================================
 
-def simple_clean(text):
-    """Take only the content after the last closing think tag."""
+def clean_response(text):
+    """Remove thinking content but keep actual response."""
     if not text:
         return ""
+    
+    # If there's a closing tag, take after it
     if '</think>' in text:
         return text.split('</think>')[-1].strip()
+    
+    # If no closing tag but has opening tag, return blank
+    if '<think>' in text:
+        return ""
+    
     return text.strip()
 
 # ============================================
@@ -102,7 +109,7 @@ Rules:
 - Keep responses between 1 and 3 sentences. Vary the length naturally.
 - ALWAYS include emojis in your response — at least one or two every time.
 - ALWAYS address the speaker by their name or a playful nickname at least once in your response.
-- VARY YOUR EMOJIS: Don't use the same emoji combo in every message.
+- VARY YOUR EMOJIS.
 - If someone asks where a person is, give a fun guess about their location FIRST, then add your feelings or sass.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
@@ -183,9 +190,8 @@ def ask_yaya(user_message, speaker_name="Someone"):
         response = client.chat.completions.create(
             messages=messages,
             model="qwen/qwen3.6-27b",
-            max_tokens=500,
         )
-        yaya_reply = simple_clean(response.choices[0].message.content)
+        yaya_reply = clean_response(response.choices[0].message.content)
         if not yaya_reply:
             yaya_reply = "Ugh, brain blank. Try again! 🤪"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -223,9 +229,8 @@ def ask_yaya_for_random_thought(nearby_names):
         response = client.chat.completions.create(
             messages=messages,
             model="qwen/qwen3.6-27b",
-            max_tokens=500,
         )
-        yaya_reply = simple_clean(response.choices[0].message.content)
+        yaya_reply = clean_response(response.choices[0].message.content)
         if not yaya_reply:
             yaya_reply = "Party's lit and so am I! 💅✨"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
