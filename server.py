@@ -170,7 +170,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="qwen/qwen3.6-27b",
+            model="qwen/qwen3-32b",
         )
         yaya_reply = response.choices[0].message.content
         if not yaya_reply or yaya_reply.strip() == "":
@@ -209,7 +209,7 @@ def ask_yaya_for_random_thought(nearby_names):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="qwen/qwen3.6-27b",
+            model="qwen/qwen3-32b",
         )
         yaya_reply = response.choices[0].message.content
         if not yaya_reply or yaya_reply.strip() == "":
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print(" YAYA - BRATS CLUB")
     print("="*50)
-    print(f"  Model: qwen/qwen3.6-27b")
+    print(f"  Model: qwen/qwen3-32b")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
     print("="*50 + "\n")
