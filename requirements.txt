@@ -1,2 +1,2 @@
 flask
-mistralai
+mistralai>=2.0.0
