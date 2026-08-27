@@ -223,9 +223,9 @@ def ask_yaya_for_random_thought(nearby_names):
     else:
         chosen_name = random.choice(nearby_names)
         if is_tt(chosen_name):
-            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Heart emojis."
+            prompt = f"You noticed {chosen_name} nearby. Say something shy and lovestruck directly TO her. Use her name. Heart emojis. One sentence."
         else:
-            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease."
+            prompt = f"You noticed {chosen_name} in the club. Call them out by name and give them a fun, bratty welcome or tease. Use their name at the START of your sentence. Use emojis. One sentence."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
@@ -277,5 +277,5 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (PRIVATE MEMORY)")
+    print("YAYA - MISTRAL")
     app.run(host="0.0.0.0", port=5000, debug=True)
