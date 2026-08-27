@@ -1,6 +1,5 @@
 from flask import Flask, request
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+from mistralai import Mistral
 import datetime
 import random
 import os
@@ -15,7 +14,7 @@ from zoneinfo import ZoneInfo
 app = Flask(__name__)
 
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
-client = MistralClient(api_key=MISTRAL_API_KEY)
+client = Mistral(api_key=MISTRAL_API_KEY)
 
 conversation_history = []
 
@@ -166,14 +165,14 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if len(conversation_history) > 20:
         conversation_history.pop(0)
     
-    # Build messages for Mistral
-    messages = [ChatMessage(role="system", content=get_system_prompt())]
+    # Build messages for Mistral v2.9.4
+    messages = [{"role": "system", "content": get_system_prompt()}]
     for msg in conversation_history[-20:]:
         role = "assistant" if msg["role"] == "assistant" else "user"
-        messages.append(ChatMessage(role=role, content=msg["content"]))
+        messages.append({"role": role, "content": msg["content"]})
     
     try:
-        response = client.chat(
+        response = client.chat.complete(
             model="mistral-small-latest",
             messages=messages,
         )
@@ -207,12 +206,12 @@ def ask_yaya_for_random_thought(nearby_names):
             prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use their name. Use varied emojis. One sentence."
     
     messages = [
-        ChatMessage(role="system", content=get_system_prompt()),
-        ChatMessage(role="user", content=prompt)
+        {"role": "system", "content": get_system_prompt()},
+        {"role": "user", "content": prompt}
     ]
     
     try:
-        response = client.chat(
+        response = client.chat.complete(
             model="mistral-small-latest",
             messages=messages,
         )
@@ -260,7 +259,7 @@ def autonomous_smart():
 
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" YAYA - BRATS CLUB (MISTRAL)")
+    print(" YAYA - BRATS CLUB (MISTRAL v2)")
     print("="*50)
     print(f"  Model: mistral-small-latest")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
