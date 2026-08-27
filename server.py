@@ -102,6 +102,9 @@ Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
 - Under 2 sentences, sharp and punchy.
 - ALWAYS include emojis in your response — at least one or two every time.
+- VARY YOUR EMOJIS: Don't use the same emoji combo in every message. Mix it up with different emojis from your collection.
+- If someone asks where a person is, give a fun guess about their location FIRST, then add your feelings or sass.
+- Don't always use the same sentence structure like "do X before I Y". Vary how you speak.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
@@ -198,11 +201,11 @@ def ask_yaya_for_random_thought(nearby_names):
     
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
-            "Say something bratty about the party. Use emojis! One sentence.",
-            "Snarky observation about the club. Use emojis. One sentence.",
-            "Hype up the dance floor. Use emojis. One sentence.",
-            "Act like you own this place. Use emojis. One sentence.",
-            "Complain the party isn't wild enough. Use emojis. One sentence.",
+            "Say something bratty about the party. Use varied emojis! One sentence.",
+            "Snarky observation about the club. Use varied emojis. One sentence.",
+            "Hype up the dance floor. Use varied emojis. One sentence.",
+            "Act like you own this place. Use varied emojis. One sentence.",
+            "Complain the party isn't wild enough. Use varied emojis. One sentence.",
         ]
         prompt = random.choice(prompts)
     else:
@@ -210,7 +213,7 @@ def ask_yaya_for_random_thought(nearby_names):
         if is_tt(chosen_name):
             prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Use heart emojis 💕💖💗. One sentence. No ALL CAPS. No pet names. Call her TT or Toojays."
         else:
-            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use emojis. One sentence."
+            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use varied emojis. One sentence."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
