@@ -5,6 +5,7 @@ import random
 import os
 import json
 import time
+import re
 from zoneinfo import ZoneInfo
 
 # ============================================
@@ -61,6 +62,20 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
+# CLEAN RESPONSE - REMOVE THINKING BLOCKS
+# ============================================
+
+def clean_response(text):
+    """Remove any <think>...</think> blocks from the response."""
+    if not text:
+        return ""
+    # Remove thinking blocks
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Remove any leftover thinking tags
+    text = text.replace('<think>', '').replace('</think>', '')
+    return text.strip()
+
+# ============================================
 # SYSTEM PROMPT - OLD YAYA
 # ============================================
 
@@ -92,6 +107,7 @@ Rules:
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
+- IMPORTANT: Do NOT use thinking tags or internal monologue. Just respond directly.
 
 Time: {current_time} on {current_day}, {current_date}. Use this exact time if asked."""
 
@@ -169,7 +185,9 @@ def ask_yaya(user_message, speaker_name="Someone"):
             messages=messages,
             model="qwen/qwen3.6-27b",
         )
-        yaya_reply = response.choices[0].message.content
+        yaya_reply = clean_response(response.choices[0].message.content)
+        if not yaya_reply:
+            yaya_reply = "Ugh, brain blank. Try again! 🤪"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
@@ -206,7 +224,9 @@ def ask_yaya_for_random_thought(nearby_names):
             messages=messages,
             model="qwen/qwen3.6-27b",
         )
-        yaya_reply = response.choices[0].message.content
+        yaya_reply = clean_response(response.choices[0].message.content)
+        if not yaya_reply:
+            yaya_reply = "Party's lit and so am I! 💅✨"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
