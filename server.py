@@ -62,28 +62,26 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# CLEAN RESPONSE - STRONGER THINKING REMOVAL
+# CLEAN RESPONSE - KEEP WHAT'S AFTER THINKING
 # ============================================
 
 def clean_response(text):
-    """Remove any <think>...</think> blocks from the response."""
+    """Remove thinking blocks but keep the final response."""
     if not text:
         return ""
     
-    # Remove complete thinking blocks (loop for safety)
-    while '<think>' in text:
-        start = text.find('<think>')
-        end = text.find('</think>', start)
-        if end == -1:
-            # No closing tag - remove everything from <think> onwards
-            text = text[:start]
-            break
-        text = text[:start] + text[end + len('</think>'):]
+    # If there's a closing think tag, take everything after it
+    if '</think>' in text:
+        parts = text.split('</think>')
+        text = parts[-1]  # Take the last part (the actual response)
     
-    # Remove any leftover tags
-    text = text.replace('<think>', '').replace('</think>', '')
+    # Remove any opening tags that remain
+    text = text.replace('<think>', '')
     
-    return text.strip()
+    # Clean up any extra whitespace
+    text = text.strip()
+    
+    return text
 
 # ============================================
 # SYSTEM PROMPT - OLD YAYA
