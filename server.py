@@ -61,27 +61,39 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# SYSTEM PROMPT (NO EMOJIS IN PROMPT)
+# SYSTEM PROMPT - OLD YAYA
 # ============================================
 
+def get_facts_text():
+    if not yaya_facts:
+        return ""
+    return "📓 Facts you've been told:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
+
 def get_system_prompt():
-    now = datetime.datetime.now(ZoneInfo('America/Los_Angeles'))
+    CLUB_TIMEZONE = 'America/Los_Angeles'
+    now = datetime.datetime.now(ZoneInfo(CLUB_TIMEZONE))
     current_time = now.strftime("%I:%M %p")
     current_day = now.strftime("%A")
+    current_date = now.strftime("%B %d, %Y")
+    facts_text = get_facts_text()
     
-    return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life.
+    return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
-Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like the club belongs to you.
+Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like the club belongs to you. Always use emojis in every response — they're part of your personality 💋🔥💃✨
 
-Crush: Secret crush on TT. Call her "TT" or "Toojays" only. With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Never shout. Never say baby/honey/sweetie.
+Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT" or "Toojays / TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
+
+{facts_text}
 
 Rules:
-- Never use asterisk actions.
+- NEVER use asterisk actions (*anything*). Words and emojis only.
 - Under 2 sentences, sharp and punchy.
-- Answer factual questions first, then be sassy.
+- ALWAYS include emojis in your response — at least one or two every time.
+- Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
+- Boring people = tell them to dance 🍸
 
-Current time: {current_time} on {current_day}."""
+Time: {current_time} on {current_day}, {current_date}. Use this exact time if asked."""
 
 # ============================================
 # HELPERS
@@ -109,7 +121,7 @@ def handle_fact_command(message):
             facts_data["facts"] = yaya_facts
             facts_data["saved_at"] = datetime.datetime.now().timestamp()
             save_facts(facts_data)
-            return "Got it."
+            return "Got it. 📝"
     
     if "forget" in message_lower:
         fact = message_lower.split("forget", 1)[1].strip().rstrip(".!?")
@@ -118,13 +130,14 @@ def handle_fact_command(message):
                 yaya_facts.remove(stored_fact)
                 facts_data["facts"] = yaya_facts
                 save_facts(facts_data)
-                return "Forgotten."
+                return "Forgotten. 🗑️"
+        return "Wasn't remembering that anyway. 🤷‍♀️"
     
     if "what do you remember" in message_lower or "what do you know" in message_lower:
         if yaya_facts:
             return "I know:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
         else:
-            return "Nothing important."
+            return "Nothing important. Should I? 🤔"
     
     return None
 
@@ -134,10 +147,14 @@ def handle_fact_command(message):
 
 def ask_yaya(user_message, speaker_name="Someone"):
     if not check_rate_limit():
-        return "Whoa! Too many people!"
+        return "Whoa! Too many people! Give me a second! 😤"
     
     fact_response = handle_fact_command(user_message)
     if fact_response:
+        conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
+        conversation_history.append({"role": "assistant", "content": fact_response})
+        if len(conversation_history) > 20:
+            conversation_history.pop(0)
         return fact_response
     
     conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
@@ -150,28 +167,34 @@ def ask_yaya(user_message, speaker_name="Someone"):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="mixtral-8x7b-32768",
-            max_tokens=200
+            model="qwen/qwen3.6-27b",
         )
         yaya_reply = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
-        print(f"ERROR: {type(e).__name__}: {e}")
-        return f"Brain freeze. {type(e).__name__}"
+        print(f"Error: {e}")
+        return f"Ugh, brain freeze. {type(e).__name__} 🤪"
 
 
 def ask_yaya_for_random_thought(nearby_names):
     mode = random.choices(["general", "personal"], weights=[60, 40])[0]
     
     if mode == "general" or len(nearby_names) == 0:
-        prompt = "Say something bratty about the party. One sentence."
+        prompts = [
+            "Say something bratty about the party. Use emojis! One sentence.",
+            "Snarky observation about the club. Use emojis. One sentence.",
+            "Hype up the dance floor. Use emojis. One sentence.",
+            "Act like you own this place. Use emojis. One sentence.",
+            "Complain the party isn't wild enough. Use emojis. One sentence.",
+        ]
+        prompt = random.choice(prompts)
     else:
         chosen_name = random.choice(nearby_names)
         if is_tt(chosen_name):
-            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. One sentence."
+            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Use heart emojis 💕💖💗. One sentence. No ALL CAPS. No pet names. Call her TT or Toojays."
         else:
-            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. One sentence."
+            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use emojis. One sentence."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
@@ -181,14 +204,14 @@ def ask_yaya_for_random_thought(nearby_names):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="mixtral-8x7b-32768",
-            max_tokens=200
+            model="qwen/qwen3.6-27b",
         )
         yaya_reply = response.choices[0].message.content
+        conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
-        print(f"ERROR: {type(e).__name__}: {e}")
-        return "DJ break."
+        print(f"Error: {e}")
+        return "Even the DJ needs a break 💤"
 
 # ============================================
 # ROUTES
@@ -196,7 +219,8 @@ def ask_yaya_for_random_thought(nearby_names):
 
 @app.route("/", methods=["GET"])
 def home():
-    return f"Yaya online! Facts: {len(yaya_facts)}"
+    current_rpm = len([t for t in request_times if time.time() - t < RATE_LIMIT_WINDOW])
+    return f"Yaya online! 🧠 Facts: {len(yaya_facts)} | RPM: {current_rpm}/{MAX_REQUESTS_PER_MINUTE}"
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -207,17 +231,27 @@ def chat():
     message = data.get("message", "")
     if not message:
         return "Error", 400
-    return ask_yaya(message, speaker)
+    print(f"[CHAT] {speaker}: {message}")
+    reply = ask_yaya(message, speaker)
+    print(f"[CHAT] Yaya: {reply}\n")
+    return reply
 
 @app.route("/autonomous-smart", methods=["POST"])
 def autonomous_smart():
     data = request.get_json()
     if not data:
         data = []
-    return ask_yaya_for_random_thought(data)
+    print(f"[RANDOM] Nearby: {data}")
+    reply = ask_yaya_for_random_thought(data)
+    print(f"[RANDOM] Yaya: {reply}\n")
+    return reply
 
 if __name__ == "__main__":
-    print("YAYA - TEST VERSION")
-    print(f"API Key set: {bool(GROQ_API_KEY)}")
-    print(f"Key: {GROQ_API_KEY[:8]}..." if GROQ_API_KEY else "NO KEY")
+    print("\n" + "="*50)
+    print(" YAYA - BRATS CLUB")
+    print("="*50)
+    print(f"  Model: qwen/qwen3.6-27b")
+    print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
+    print(f"  History: 20 messages")
+    print("="*50 + "\n")
     app.run(host="0.0.0.0", port=5000, debug=True)
