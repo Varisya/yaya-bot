@@ -61,6 +61,18 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
+# SIMPLE CLEANER - TAKE AFTER </think>
+# ============================================
+
+def simple_clean(text):
+    """Take only the content after the last closing think tag."""
+    if not text:
+        return ""
+    if '</think>' in text:
+        return text.split('</think>')[-1].strip()
+    return text.strip()
+
+# ============================================
 # SYSTEM PROMPT - OLD YAYA
 # ============================================
 
@@ -170,10 +182,11 @@ def ask_yaya(user_message, speaker_name="Someone"):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="qwen/qwen3-32b",
+            model="qwen/qwen3.6-27b",
+            max_tokens=500,
         )
-        yaya_reply = response.choices[0].message.content
-        if not yaya_reply or yaya_reply.strip() == "":
+        yaya_reply = simple_clean(response.choices[0].message.content)
+        if not yaya_reply:
             yaya_reply = "Ugh, brain blank. Try again! 🤪"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
@@ -209,10 +222,11 @@ def ask_yaya_for_random_thought(nearby_names):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="qwen/qwen3-32b",
+            model="qwen/qwen3.6-27b",
+            max_tokens=500,
         )
-        yaya_reply = response.choices[0].message.content
-        if not yaya_reply or yaya_reply.strip() == "":
+        yaya_reply = simple_clean(response.choices[0].message.content)
+        if not yaya_reply:
             yaya_reply = "Party's lit and so am I! 💅✨"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
@@ -257,8 +271,7 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print(" YAYA - BRATS CLUB")
     print("="*50)
-    print(f"  Model: qwen/qwen3-32b")
+    print(f"  Model: qwen/qwen3.6-27b")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
-    print(f"  History: 20 messages")
     print("="*50 + "\n")
     app.run(host="0.0.0.0", port=5000, debug=True)
