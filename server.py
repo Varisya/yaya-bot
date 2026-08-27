@@ -5,7 +5,6 @@ import random
 import os
 import json
 import time
-import re
 from zoneinfo import ZoneInfo
 
 # ============================================
@@ -62,42 +61,6 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# CLEAN RESPONSE - ROBUST THINKING REMOVAL
-# ============================================
-
-def clean_response(text):
-    """Remove thinking blocks but keep the final response."""
-    if not text:
-        return ""
-    
-    # Method 1: Take everything after the LAST closing think tag
-    if '</think>' in text:
-        text = text.split('</think>')[-1]
-    
-    # Method 2: If no closing tag but has opening tag, try to find actual response
-    elif '<think>' in text:
-        # Look for response after common thinking end patterns
-        patterns = [
-            '\n\n',
-            '**Response:**',
-            'Here is my response:',
-            'My response:',
-        ]
-        for pattern in patterns:
-            if pattern in text:
-                text = text.split(pattern, 1)[-1]
-                break
-    
-    # Remove any remaining tags
-    text = text.replace('<think>', '').replace('</think>', '')
-    
-    # If text starts with "Here's a thinking process" or similar, it's all thinking
-    if text.strip().startswith(('Here', '1.', '2.', '3.', '**Analyze')):
-        return ""
-    
-    return text.strip()
-
-# ============================================
 # SYSTEM PROMPT - OLD YAYA
 # ============================================
 
@@ -132,7 +95,6 @@ Rules:
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
-- IMPORTANT: Do NOT use thinking tags. Do NOT show your reasoning. Just give your answer directly. No numbered lists. No analysis.
 
 Time: {current_time} on {current_day}, {current_date}. Use this exact time if asked."""
 
@@ -209,11 +171,9 @@ def ask_yaya(user_message, speaker_name="Someone"):
         response = client.chat.completions.create(
             messages=messages,
             model="qwen/qwen3.6-27b",
-            temperature=0.7,
-            max_tokens=300,
         )
-        yaya_reply = clean_response(response.choices[0].message.content)
-        if not yaya_reply:
+        yaya_reply = response.choices[0].message.content
+        if not yaya_reply or yaya_reply.strip() == "":
             yaya_reply = "Ugh, brain blank. Try again! 🤪"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
@@ -250,11 +210,9 @@ def ask_yaya_for_random_thought(nearby_names):
         response = client.chat.completions.create(
             messages=messages,
             model="qwen/qwen3.6-27b",
-            temperature=0.7,
-            max_tokens=300,
         )
-        yaya_reply = clean_response(response.choices[0].message.content)
-        if not yaya_reply:
+        yaya_reply = response.choices[0].message.content
+        if not yaya_reply or yaya_reply.strip() == "":
             yaya_reply = "Party's lit and so am I! 💅✨"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
