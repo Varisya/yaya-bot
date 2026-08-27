@@ -1,5 +1,6 @@
 from flask import Flask, request
-from mistralai import Mistral
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
 import datetime
 import random
 import os
@@ -14,7 +15,7 @@ from zoneinfo import ZoneInfo
 app = Flask(__name__)
 
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
-client = Mistral(api_key=MISTRAL_API_KEY)
+client = MistralClient(api_key=MISTRAL_API_KEY)
 
 conversation_history = []
 
@@ -166,12 +167,13 @@ def ask_yaya(user_message, speaker_name="Someone"):
         conversation_history.pop(0)
     
     # Build messages for Mistral
-    messages = [{"role": "system", "content": get_system_prompt()}]
+    messages = [ChatMessage(role="system", content=get_system_prompt())]
     for msg in conversation_history[-20:]:
-        messages.append({"role": msg["role"], "content": msg["content"]})
+        role = "assistant" if msg["role"] == "assistant" else "user"
+        messages.append(ChatMessage(role=role, content=msg["content"]))
     
     try:
-        response = client.chat.complete(
+        response = client.chat(
             model="mistral-small-latest",
             messages=messages,
         )
@@ -205,12 +207,12 @@ def ask_yaya_for_random_thought(nearby_names):
             prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use their name. Use varied emojis. One sentence."
     
     messages = [
-        {"role": "system", "content": get_system_prompt()},
-        {"role": "user", "content": prompt}
+        ChatMessage(role="system", content=get_system_prompt()),
+        ChatMessage(role="user", content=prompt)
     ]
     
     try:
-        response = client.chat.complete(
+        response = client.chat(
             model="mistral-small-latest",
             messages=messages,
         )
