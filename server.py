@@ -16,8 +16,8 @@ app = Flask(__name__)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Use Gemini Flash - free tier
-model = genai.GenerativeModel("gemini-1.5-flash")
+# Use Gemini Flash - current free model
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 conversation_history = []
 
@@ -168,11 +168,12 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if len(conversation_history) > 20:
         conversation_history.pop(0)
     
-    # Build messages for Gemini
-    messages = [{"role": "user", "parts": [get_system_prompt() + "\n\nConversation:\n" + "\n".join([m["content"] for m in conversation_history[-20:]])]}]
+    # Build the prompt with conversation history
+    history_text = "\n".join([m["content"] for m in conversation_history[-20:]])
+    full_prompt = get_system_prompt() + "\n\nConversation so far:\n" + history_text
     
     try:
-        response = model.generate_content(messages[0]["parts"][0])
+        response = model.generate_content(full_prompt)
         yaya_reply = response.text
         if not yaya_reply or yaya_reply.strip() == "":
             yaya_reply = "Ugh, brain blank. Try again! 🤪"
@@ -252,7 +253,7 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print(" YAYA - BRATS CLUB (GEMINI)")
     print("="*50)
-    print(f"  Model: gemini-1.5-flash")
+    print(f"  Model: gemini-2.0-flash")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print("="*50 + "\n")
     app.run(host="0.0.0.0", port=5000, debug=True)
