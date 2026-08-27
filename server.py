@@ -62,6 +62,102 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
+# PEOPLE MEMORY SYSTEM (PERMANENT)
+# ============================================
+
+PEOPLE_FILE = "yaya_people.json"
+
+def load_people():
+    try:
+        with open(PEOPLE_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_people(people_data):
+    with open(PEOPLE_FILE, "w") as f:
+        json.dump(people_data, f)
+
+people_memory = load_people()
+
+def extract_person_fact(message):
+    """Try to extract [Name] is [fact] from a message."""
+    message_lower = message.lower()
+    
+    # Block questions
+    if "?" in message:
+        return None, None
+    if message_lower.startswith(("who ", "what ", "where ", "when ", "why ", "how ")):
+        return None, None
+    
+    # Pattern: "Yaya, did you know [Name] is [fact]?"
+    if "did you know" in message_lower:
+        rest = message_lower.split("did you know", 1)[1].strip()
+        for connector in [" is ", " loves ", " always ", " has ", " makes "]:
+            if connector in rest:
+                parts = rest.split(connector, 1)
+                name = parts[0].strip().rstrip(".!?")
+                fact = parts[1].strip().rstrip(".!?")
+                if name and fact and len(name) > 1 and len(fact) > 1:
+                    if name not in ["who", "what", "where", "when", "why", "how"]:
+                        return name, fact
+        return None, None
+    
+    # Pattern: "Yaya, [Name] is [fact]"
+    if message_lower.startswith(("yaya,", "yaya ")):
+        rest = message_lower.split("yaya", 1)[1].strip().lstrip(",").strip()
+        for connector in [" is ", " loves ", " always ", " has ", " makes "]:
+            if connector in rest:
+                parts = rest.split(connector, 1)
+                name = parts[0].strip().rstrip(".!?")
+                fact = parts[1].strip().rstrip(".!?")
+                if name and fact and len(name) > 1 and len(fact) > 1:
+                    if "yaya" not in name.lower():
+                        if name not in ["who", "what", "where", "when", "why", "how"]:
+                            return name, fact
+        return None, None
+    
+    return None, None
+
+def handle_people_learning(message):
+    """Silently store facts about people."""
+    global people_memory
+    
+    name, fact = extract_person_fact(message)
+    
+    if name and fact:
+        name_clean = name.replace(" resident", "").strip()
+        
+        if name_clean not in people_memory:
+            people_memory[name_clean] = []
+        
+        if fact not in people_memory[name_clean]:
+            people_memory[name_clean].append(fact)
+            save_people(people_memory)
+            print(f"[PEOPLE] Learned: {name_clean} = {fact}")
+        
+        # Return None so Yaya responds normally
+        return None
+    
+    return None
+
+def get_person_facts(speaker_name):
+    """Get stored facts about a person."""
+    global people_memory
+    
+    name_clean = speaker_name.replace(" resident", "").strip()
+    
+    if name_clean in people_memory:
+        return people_memory[name_clean]
+    
+    name_lower = name_clean.lower()
+    for stored_name, facts in people_memory.items():
+        if name_lower in stored_name.lower() or stored_name.lower() in name_lower:
+            return facts
+    
+    return None
+
+# ============================================
 # PUBLIC REJECTIONS (NO /99 MENTION)
 # ============================================
 
@@ -83,13 +179,27 @@ def get_facts_text():
         return ""
     return "📓 Facts you've been told:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
 
-def get_system_prompt():
+def get_system_prompt(speaker_name=None):
     CLUB_TIMEZONE = 'America/Los_Angeles'
     now = datetime.datetime.now(ZoneInfo(CLUB_TIMEZONE))
     current_time = now.strftime("%I:%M %p")
     current_day = now.strftime("%A")
     current_date = now.strftime("%B %d, %Y")
     facts_text = get_facts_text()
+    
+    # Check for people memories about the speaker
+    people_text = ""
+    if speaker_name:
+        speaker_facts = get_person_facts(speaker_name)
+        if speaker_facts:
+            # Random 40% chance to mention the fact
+            if random.random() < 0.4:
+                facts_list = "\n".join([f"- {fact}" for fact in speaker_facts])
+                people_text = f"""
+🎯 THINGS YOU REMEMBER ABOUT {speaker_name}:
+{facts_list}
+
+You remember these things about {speaker_name}. Weave ONE of these facts into your response in a fun, bratty, playful way. Tease them, exaggerate it, or reference it casually. Don't just say "I remember X". Make it natural and funny."""
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
@@ -98,6 +208,7 @@ Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentles
 Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT" or "Toojays / TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
 
 {facts_text}
+{people_text}
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
@@ -185,6 +296,10 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if not check_rate_limit():
         return "Whoa! Too many people! 😤"
     
+    # Check for people learning first (silent)
+    handle_people_learning(user_message)
+    
+    # Check for fact commands
     fact_response = handle_fact_command(user_message)
     if fact_response:
         return fact_response
@@ -193,7 +308,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if len(conversation_history) > 20:
         conversation_history.pop(0)
     
-    messages = [{"role": "system", "content": get_system_prompt()}]
+    messages = [{"role": "system", "content": get_system_prompt(speaker_name)}]
     for msg in conversation_history[-20:]:
         role = "assistant" if msg["role"] == "assistant" else "user"
         messages.append({"role": role, "content": msg["content"]})
@@ -247,7 +362,7 @@ def ask_yaya_for_random_thought(nearby_names):
 
 @app.route("/", methods=["GET"])
 def home():
-    return f"Yaya online! Facts: {len(yaya_facts)}"
+    return f"Yaya online! Facts: {len(yaya_facts)} | People: {len(people_memory)}"
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -277,5 +392,6 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL")
+    print("YAYA - MISTRAL (PEOPLE MEMORY)")
+    print(f"People stored: {len(people_memory)}")
     app.run(host="0.0.0.0", port=5000, debug=True)
