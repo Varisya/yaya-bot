@@ -175,7 +175,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="gemma2-9b-it",
+            model="mixtral-8x7b-32768",
         )
         yaya_reply = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -212,7 +212,7 @@ def ask_yaya_for_random_thought(nearby_names):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="gemma2-9b-it",
+            model="mixtral-8x7b-32768",
         )
         yaya_reply = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print(" YAYA - BRATS CLUB")
     print("="*50)
-    print(f"  Model: gemma2-9b-it")
+    print(f"  Model: mixtral-8x7b-32768")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
     print("="*50 + "\n")
