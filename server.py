@@ -88,10 +88,11 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/T
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
-- Keep responses between 1 and 3 sentences. Vary the length naturally.
-- ALWAYS include emojis in your response.
-- ALWAYS address the speaker by their name or playful nickname.
-- VARY YOUR EMOJIS.
+- VARY YOUR RESPONSE LENGTH: Sometimes respond with just 1 short sentence. Sometimes 2 sentences. Sometimes 3 full sentences. NEVER always use exactly 2 sentences. Mix it up naturally like a real person would.
+- ALWAYS include emojis in your response — at least one or two every time.
+- ALWAYS address the speaker by their name or a playful nickname at least once in your response.
+- VARY YOUR EMOJIS: Don't use the same emoji combo in every message.
+- If someone asks where a person is, give a fun guess about their location FIRST, then add your feelings or sass.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
@@ -107,7 +108,7 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
-# MISTRAL API CALL (NO LIBRARY NEEDED)
+# MISTRAL API CALL
 # ============================================
 
 def call_mistral(messages):
@@ -117,7 +118,8 @@ def call_mistral(messages):
     }
     payload = {
         "model": "mistral-small-latest",
-        "messages": messages
+        "messages": messages,
+        "temperature": 0.8
     }
     response = requests.post(MISTRAL_URL, headers=headers, json=payload)
     response.raise_for_status()
@@ -248,5 +250,5 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (NO LIBRARY)")
+    print("YAYA - MISTRAL")
     app.run(host="0.0.0.0", port=5000, debug=True)
