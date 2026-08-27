@@ -62,15 +62,27 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# CLEAN RESPONSE - REMOVE THINKING BLOCKS
+# CLEAN RESPONSE - STRONGER THINKING REMOVAL
 # ============================================
 
 def clean_response(text):
     """Remove any <think>...</think> blocks from the response."""
     if not text:
         return ""
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    
+    # Remove complete thinking blocks (loop for safety)
+    while '<think>' in text:
+        start = text.find('<think>')
+        end = text.find('</think>', start)
+        if end == -1:
+            # No closing tag - remove everything from <think> onwards
+            text = text[:start]
+            break
+        text = text[:start] + text[end + len('</think>'):]
+    
+    # Remove any leftover tags
     text = text.replace('<think>', '').replace('</think>', '')
+    
     return text.strip()
 
 # ============================================
@@ -100,16 +112,15 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/T
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
-- Keep responses between 1 and 3 sentences. Vary the length naturally. Sometimes a short 1-sentence comeback, sometimes 3 sentences if you have more to say. Don't always use exactly 2 sentences.
+- Keep responses between 1 and 3 sentences. Vary the length naturally.
 - ALWAYS include emojis in your response — at least one or two every time.
-- ALWAYS address the speaker by their name or a playful nickname at least once in your response. NEVER forget to say their name. For example: "Varisya, look who finally showed up!" or "Oh Varis, you actually said something smart for once."
-- VARY YOUR EMOJIS: Don't use the same emoji combo in every message. Mix it up with different emojis from your collection.
+- ALWAYS address the speaker by their name or a playful nickname at least once in your response.
+- VARY YOUR EMOJIS: Don't use the same emoji combo in every message.
 - If someone asks where a person is, give a fun guess about their location FIRST, then add your feelings or sass.
-- Don't always use the same sentence structure like "do X before I Y". Vary how you speak.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
-- IMPORTANT: Do NOT use thinking tags or internal monologue. Just respond directly.
+- IMPORTANT: Do NOT use thinking tags. Do NOT show your reasoning. Just give your answer directly.
 
 Time: {current_time} on {current_day}, {current_date}. Use this exact time if asked."""
 
