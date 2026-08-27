@@ -175,14 +175,14 @@ def ask_yaya(user_message, speaker_name="Someone"):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="llama-3.3-70b-versatile",
+            model="gemma2-9b-it",
         )
         yaya_reply = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
         print(f"Error: {e}")
-        return "Ugh, brain freeze. Too much partying 🤪"
+        return f"Ugh, brain freeze. {type(e).__name__} 🤪"
 
 
 def ask_yaya_for_random_thought(nearby_names):
@@ -212,7 +212,7 @@ def ask_yaya_for_random_thought(nearby_names):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model="llama-3.3-70b-versatile",
+            model="gemma2-9b-it",
         )
         yaya_reply = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print(" YAYA - BRATS CLUB")
     print("="*50)
-    print(f"  Model: llama-3.3-70b-versatile")
+    print(f"  Model: gemma2-9b-it")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print(f"  History: 20 messages")
     print("="*50 + "\n")
