@@ -62,7 +62,7 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# CLEAN RESPONSE - KEEP WHAT'S AFTER THINKING
+# CLEAN RESPONSE - ROBUST THINKING REMOVAL
 # ============================================
 
 def clean_response(text):
@@ -70,18 +70,32 @@ def clean_response(text):
     if not text:
         return ""
     
-    # If there's a closing think tag, take everything after it
+    # Method 1: Take everything after the LAST closing think tag
     if '</think>' in text:
-        parts = text.split('</think>')
-        text = parts[-1]  # Take the last part (the actual response)
+        text = text.split('</think>')[-1]
     
-    # Remove any opening tags that remain
-    text = text.replace('<think>', '')
+    # Method 2: If no closing tag but has opening tag, try to find actual response
+    elif '<think>' in text:
+        # Look for response after common thinking end patterns
+        patterns = [
+            '\n\n',
+            '**Response:**',
+            'Here is my response:',
+            'My response:',
+        ]
+        for pattern in patterns:
+            if pattern in text:
+                text = text.split(pattern, 1)[-1]
+                break
     
-    # Clean up any extra whitespace
-    text = text.strip()
+    # Remove any remaining tags
+    text = text.replace('<think>', '').replace('</think>', '')
     
-    return text
+    # If text starts with "Here's a thinking process" or similar, it's all thinking
+    if text.strip().startswith(('Here', '1.', '2.', '3.', '**Analyze')):
+        return ""
+    
+    return text.strip()
 
 # ============================================
 # SYSTEM PROMPT - OLD YAYA
@@ -118,7 +132,7 @@ Rules:
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
-- IMPORTANT: Do NOT use thinking tags. Do NOT show your reasoning. Just give your answer directly.
+- IMPORTANT: Do NOT use thinking tags. Do NOT show your reasoning. Just give your answer directly. No numbered lists. No analysis.
 
 Time: {current_time} on {current_day}, {current_date}. Use this exact time if asked."""
 
@@ -195,6 +209,8 @@ def ask_yaya(user_message, speaker_name="Someone"):
         response = client.chat.completions.create(
             messages=messages,
             model="qwen/qwen3.6-27b",
+            temperature=0.7,
+            max_tokens=300,
         )
         yaya_reply = clean_response(response.choices[0].message.content)
         if not yaya_reply:
@@ -234,6 +250,8 @@ def ask_yaya_for_random_thought(nearby_names):
         response = client.chat.completions.create(
             messages=messages,
             model="qwen/qwen3.6-27b",
+            temperature=0.7,
+            max_tokens=300,
         )
         yaya_reply = clean_response(response.choices[0].message.content)
         if not yaya_reply:
