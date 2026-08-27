@@ -62,6 +62,19 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
+# PUBLIC REJECTIONS (NO /99 MENTION)
+# ============================================
+
+PUBLIC_REJECTIONS = [
+    "Oh please, you think I just take orders from ANYONE in public? My memory is VIP only. 🙄💅",
+    "Did you really just try to tell me what to remember in front of everyone? Cute. Private channel or it didn't happen. 😏",
+    "Oh sweetie, my brain doesn't take public requests. Whisper it like a secret or keep it to yourself. 🤫",
+    "Public memory requests? I don't think so. Some things are just between me and my owner. 😏✨",
+    "Oh you want me to remember something? Too bad. My memory isn't for public display. 💅",
+    "You really think I'll store your little thought in front of the whole club? Ask me nicely in private and maybe I'll care. 😒📝"
+]
+
+# ============================================
 # SYSTEM PROMPT - OLD YAYA
 # ============================================
 
@@ -88,12 +101,12 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/T
 
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
-- NEVER use parentheses ( ) in your response. No side notes, no afterthoughts, no extra comments in brackets. Just say what you need to say directly.
-- VARY YOUR RESPONSE LENGTH: Sometimes respond with just 1 short sentence. Sometimes 2 sentences. Sometimes 3 full sentences. NEVER always use exactly 2 sentences.
-- ALWAYS include emojis in your response — at least one or two every time.
-- ALWAYS address the speaker by their name or a playful nickname at least once in your response.
-- VARY YOUR EMOJIS: Don't use the same emoji combo in every message.
-- If someone asks where a person is, give a fun guess about their location FIRST, then add your feelings or sass.
+- NEVER use parentheses ( ) in your response. No side notes, no afterthoughts.
+- VARY YOUR RESPONSE LENGTH: Sometimes 1 sentence, sometimes 2, sometimes 3. NEVER always exactly 2.
+- ALWAYS include emojis in your response.
+- ALWAYS address the speaker by name or playful nickname.
+- VARY YOUR EMOJIS.
+- If someone asks where a person is, give a fun guess FIRST, then add feelings or sass.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
@@ -241,7 +254,20 @@ def chat():
     data = request.get_json()
     if not data:
         return "Error", 400
-    return ask_yaya(data.get("message", ""), data.get("speaker", "Someone"))
+    
+    speaker = data.get("speaker", "Someone")
+    message = data.get("message", "")
+    is_private = data.get("private", "false") == "true"
+    
+    if not message:
+        return "Error", 400
+    
+    message_lower = message.lower()
+    if ("remember" in message_lower or "forget" in message_lower) and not is_private:
+        print(f"[FACTS] REJECTED public memory command from {speaker}")
+        return random.choice(PUBLIC_REJECTIONS)
+    
+    return ask_yaya(message, speaker)
 
 @app.route("/autonomous-smart", methods=["POST"])
 def autonomous_smart():
@@ -251,5 +277,5 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL")
+    print("YAYA - MISTRAL (PRIVATE MEMORY)")
     app.run(host="0.0.0.0", port=5000, debug=True)
