@@ -1,10 +1,10 @@
 from flask import Flask, request
-from mistralai import Mistral
 import datetime
 import random
 import os
 import json
 import time
+import requests
 from zoneinfo import ZoneInfo
 
 # ============================================
@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 app = Flask(__name__)
 
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
-client = Mistral(api_key=MISTRAL_API_KEY)
+MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 
 conversation_history = []
 
@@ -89,10 +89,9 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/T
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
 - Keep responses between 1 and 3 sentences. Vary the length naturally.
-- ALWAYS include emojis in your response — at least one or two every time.
-- ALWAYS address the speaker by their name or a playful nickname at least once in your response.
-- VARY YOUR EMOJIS: Don't use the same emoji combo in every message.
-- If someone asks where a person is, give a fun guess about their location FIRST, then add your feelings or sass.
+- ALWAYS include emojis in your response.
+- ALWAYS address the speaker by their name or playful nickname.
+- VARY YOUR EMOJIS.
 - Factual questions: answer first, then be sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
 - Boring people = tell them to dance 🍸
@@ -106,6 +105,23 @@ Time: {current_time} on {current_day}, {current_date}. Use this exact time if as
 def is_tt(name):
     name_lower = name.lower()
     return "toojays" in name_lower or name_lower == "tt"
+
+# ============================================
+# MISTRAL API CALL (NO LIBRARY NEEDED)
+# ============================================
+
+def call_mistral(messages):
+    headers = {
+        "Authorization": f"Bearer {MISTRAL_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "mistral-small-latest",
+        "messages": messages
+    }
+    response = requests.post(MISTRAL_URL, headers=headers, json=payload)
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
 
 # ============================================
 # FACTS MANAGEMENT
@@ -137,11 +153,11 @@ def handle_fact_command(message):
                 return "Forgotten. 🗑️"
         return "Wasn't remembering that anyway. 🤷‍♀️"
     
-    if "what do you remember" in message_lower or "what do you know" in message_lower:
+    if "what do you remember" in message_lower:
         if yaya_facts:
             return "I know:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
         else:
-            return "Nothing important. Should I? 🤔"
+            return "Nothing important. 🤔"
     
     return None
 
@@ -151,39 +167,30 @@ def handle_fact_command(message):
 
 def ask_yaya(user_message, speaker_name="Someone"):
     if not check_rate_limit():
-        return "Whoa! Too many people! Give me a second! 😤"
+        return "Whoa! Too many people! 😤"
     
     fact_response = handle_fact_command(user_message)
     if fact_response:
-        conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
-        conversation_history.append({"role": "assistant", "content": fact_response})
-        if len(conversation_history) > 20:
-            conversation_history.pop(0)
         return fact_response
     
     conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
     if len(conversation_history) > 20:
         conversation_history.pop(0)
     
-    # Build messages for Mistral v2.9.4
     messages = [{"role": "system", "content": get_system_prompt()}]
     for msg in conversation_history[-20:]:
         role = "assistant" if msg["role"] == "assistant" else "user"
         messages.append({"role": role, "content": msg["content"]})
     
     try:
-        response = client.chat.complete(
-            model="mistral-small-latest",
-            messages=messages,
-        )
-        yaya_reply = response.choices[0].message.content
+        yaya_reply = call_mistral(messages)
         if not yaya_reply or yaya_reply.strip() == "":
-            yaya_reply = "Ugh, brain blank. Try again! 🤪"
+            yaya_reply = "Ugh, brain blank. 🤪"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
         print(f"Error: {e}")
-        return f"Ugh, brain freeze. {type(e).__name__} 🤪"
+        return f"Brain freeze. {type(e).__name__} 🤪"
 
 
 def ask_yaya_for_random_thought(nearby_names):
@@ -191,19 +198,18 @@ def ask_yaya_for_random_thought(nearby_names):
     
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
-            "Say something bratty about the party. Use varied emojis! One sentence.",
-            "Snarky observation about the club. Use varied emojis. One sentence.",
-            "Hype up the dance floor. Use varied emojis. One sentence.",
-            "Act like you own this place. Use varied emojis. One sentence.",
-            "Complain the party isn't wild enough. Use varied emojis. One sentence.",
+            "Say something bratty about the party. Use emojis!",
+            "Snarky observation about the club. Use emojis.",
+            "Hype up the dance floor. Use emojis.",
+            "Complain the party isn't wild enough. Use emojis.",
         ]
         prompt = random.choice(prompts)
     else:
         chosen_name = random.choice(nearby_names)
         if is_tt(chosen_name):
-            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Use heart emojis 💕💖💗. One sentence. No ALL CAPS. No pet names. Call her TT or Toojays."
+            prompt = f"You noticed {chosen_name}. Shy, lovestruck comment. Heart emojis."
         else:
-            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease. Use their name. Use varied emojis. One sentence."
+            prompt = f"You noticed {chosen_name}. Fun, bratty welcome or tease."
     
     messages = [
         {"role": "system", "content": get_system_prompt()},
@@ -211,18 +217,13 @@ def ask_yaya_for_random_thought(nearby_names):
     ]
     
     try:
-        response = client.chat.complete(
-            model="mistral-small-latest",
-            messages=messages,
-        )
-        yaya_reply = response.choices[0].message.content
+        yaya_reply = call_mistral(messages)
         if not yaya_reply or yaya_reply.strip() == "":
-            yaya_reply = "Party's lit and so am I! 💅✨"
+            yaya_reply = "Party's lit! 💅✨"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
-        print(f"Error: {e}")
-        return "Even the DJ needs a break 💤"
+        return "DJ break. 💤"
 
 # ============================================
 # ROUTES
@@ -230,38 +231,22 @@ def ask_yaya_for_random_thought(nearby_names):
 
 @app.route("/", methods=["GET"])
 def home():
-    current_rpm = len([t for t in request_times if time.time() - t < RATE_LIMIT_WINDOW])
-    return f"Yaya online! 🧠 Facts: {len(yaya_facts)} | RPM: {current_rpm}/{MAX_REQUESTS_PER_MINUTE}"
+    return f"Yaya online! Facts: {len(yaya_facts)}"
 
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
     if not data:
         return "Error", 400
-    speaker = data.get("speaker", "Someone")
-    message = data.get("message", "")
-    if not message:
-        return "Error", 400
-    print(f"[CHAT] {speaker}: {message}")
-    reply = ask_yaya(message, speaker)
-    print(f"[CHAT] Yaya: {reply}\n")
-    return reply
+    return ask_yaya(data.get("message", ""), data.get("speaker", "Someone"))
 
 @app.route("/autonomous-smart", methods=["POST"])
 def autonomous_smart():
     data = request.get_json()
     if not data:
         data = []
-    print(f"[RANDOM] Nearby: {data}")
-    reply = ask_yaya_for_random_thought(data)
-    print(f"[RANDOM] Yaya: {reply}\n")
-    return reply
+    return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("\n" + "="*50)
-    print(" YAYA - BRATS CLUB (MISTRAL v2)")
-    print("="*50)
-    print(f"  Model: mistral-small-latest")
-    print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
-    print("="*50 + "\n")
+    print("YAYA - MISTRAL (NO LIBRARY)")
     app.run(host="0.0.0.0", port=5000, debug=True)
