@@ -17,7 +17,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
 # Use Gemini Flash - current free model
-model = genai.GenerativeModel("gemini-2.0-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 conversation_history = []
 
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print(" YAYA - BRATS CLUB (GEMINI)")
     print("="*50)
-    print(f"  Model: gemini-2.0-flash")
+    print(f"  Model: gemini-2.5-flash")
     print(f"  RPM limit: {MAX_REQUESTS_PER_MINUTE}")
     print("="*50 + "\n")
     app.run(host="0.0.0.0", port=5000, debug=True)
