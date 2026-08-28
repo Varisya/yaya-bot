@@ -84,8 +84,8 @@ def extract_person_fact(message):
     """Try to extract [Name] is [fact] from a message."""
     message_lower = message.lower()
     
-    # Block questions
-    if "?" in message:
+    # Block questions EXCEPT "did you know" teaching patterns
+    if "?" in message and "did you know" not in message_lower:
         return None, None
     if message_lower.startswith(("who ", "what ", "where ", "when ", "why ", "how ")):
         return None, None
