@@ -36,7 +36,7 @@ def check_rate_limit():
     return True
 
 # ============================================
-# FACTS MEMORY SYSTEM (24-HOUR)
+# FACTS MEMORY SYSTEM (24-HOUR) - Channel 98
 # ============================================
 
 FACTS_FILE = "yaya_facts.json"
@@ -81,16 +81,16 @@ def save_people(people_data):
 people_memory = load_people()
 
 def extract_person_fact(message):
-    """Try to extract [Name] is [fact] from a message."""
+    """Try to extract [Name] is [fact] from a message. Only for public chat."""
     message_lower = message.lower()
     
-    # Block questions EXCEPT "did you know" teaching patterns
     if "?" in message and "did you know" not in message_lower:
         return None, None
     if message_lower.startswith(("who ", "what ", "where ", "when ", "why ", "how ")):
         return None, None
+    if "remember" in message_lower or "forget" in message_lower:
+        return None, None
     
-    # Pattern: "Yaya, did you know [Name] is [fact]?"
     if "did you know" in message_lower:
         rest = message_lower.split("did you know", 1)[1].strip()
         for connector in [" is ", " loves ", " always ", " has ", " makes "]:
@@ -103,7 +103,6 @@ def extract_person_fact(message):
                         return name, fact
         return None, None
     
-    # Pattern: "Yaya, [Name] is [fact]"
     if message_lower.startswith(("yaya,", "yaya ")):
         rest = message_lower.split("yaya", 1)[1].strip().lstrip(",").strip()
         for connector in [" is ", " loves ", " always ", " has ", " makes "]:
@@ -120,7 +119,7 @@ def extract_person_fact(message):
     return None, None
 
 def handle_people_learning(message):
-    """Silently store facts about people."""
+    """Silently store facts about people from public chat."""
     global people_memory
     
     name, fact = extract_person_fact(message)
@@ -141,7 +140,7 @@ def handle_people_learning(message):
     return None
 
 def get_person_facts(speaker_name):
-    """Get stored facts about a person."""
+    """Get stored facts about a person by their name."""
     global people_memory
     
     name_clean = speaker_name.replace(" resident", "").strip()
@@ -156,8 +155,26 @@ def get_person_facts(speaker_name):
     
     return None
 
+def find_mentioned_person(message):
+    """Check if a message mentions any person we have facts about."""
+    global people_memory
+    
+    message_lower = message.lower()
+    
+    for stored_name in people_memory:
+        if stored_name.lower() in message_lower:
+            return stored_name
+    
+    # Check partial matches
+    for stored_name in people_memory:
+        name_first = stored_name.split()[0].lower()
+        if len(name_first) > 2 and name_first in message_lower:
+            return stored_name
+    
+    return None
+
 # ============================================
-# PUBLIC REJECTIONS (NO /99 MENTION)
+# PUBLIC REJECTIONS
 # ============================================
 
 PUBLIC_REJECTIONS = [
@@ -170,7 +187,7 @@ PUBLIC_REJECTIONS = [
 ]
 
 # ============================================
-# SYSTEM PROMPT - OLD YAYA
+# SYSTEM PROMPT
 # ============================================
 
 def get_facts_text():
@@ -178,7 +195,7 @@ def get_facts_text():
         return ""
     return "📓 Facts you've been told:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
 
-def get_system_prompt(speaker_name=None):
+def get_system_prompt(speaker_name=None, mentioned_person=None):
     CLUB_TIMEZONE = 'America/Los_Angeles'
     now = datetime.datetime.now(ZoneInfo(CLUB_TIMEZONE))
     current_time = now.strftime("%I:%M %p")
@@ -186,17 +203,28 @@ def get_system_prompt(speaker_name=None):
     current_date = now.strftime("%B %d, %Y")
     facts_text = get_facts_text()
     
+    # Check for people memories about the speaker
     people_text = ""
-    if speaker_name:
+    
+    # Priority: mentioned person first, then speaker
+    if mentioned_person:
+        mentioned_facts = get_person_facts(mentioned_person)
+        if mentioned_facts and random.random() < 0.4:
+            facts_list = "\n".join([f"- {fact}" for fact in mentioned_facts])
+            people_text = f"""
+🎯 THINGS YOU REMEMBER ABOUT {mentioned_person}:
+{facts_list}
+
+Someone is asking about {mentioned_person}. You remember these things about them. Weave ONE of these facts into your response in a fun, bratty, playful way. Tease them, exaggerate it, or reference it casually."""
+    elif speaker_name:
         speaker_facts = get_person_facts(speaker_name)
-        if speaker_facts:
-            if random.random() < 0.4:
-                facts_list = "\n".join([f"- {fact}" for fact in speaker_facts])
-                people_text = f"""
+        if speaker_facts and random.random() < 0.4:
+            facts_list = "\n".join([f"- {fact}" for fact in speaker_facts])
+            people_text = f"""
 🎯 THINGS YOU REMEMBER ABOUT {speaker_name}:
 {facts_list}
 
-You remember these things about {speaker_name}. Weave ONE of these facts into your response in a fun, bratty, playful way. Tease them, exaggerate it, or reference it casually. Don't just say "I remember X". Make it natural and funny."""
+You remember these things about {speaker_name}. Weave ONE of these facts into your response in a fun, bratty, playful way. Tease them, exaggerate it, or reference it casually."""
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
@@ -210,7 +238,7 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/T
 Rules:
 - NEVER use asterisk actions (*anything*). Words and emojis only.
 - NEVER use parentheses ( ) in your response. No side notes, no afterthoughts.
-- VARY YOUR RESPONSE LENGTH: Sometimes 1 sentence, sometimes 2, sometimes 3. NEVER always exactly 2.
+- VARY YOUR RESPONSE LENGTH: Sometimes 1 sentence, sometimes 2, sometimes 3.
 - ALWAYS include emojis in your response.
 - ALWAYS address the speaker by name or playful nickname.
 - VARY YOUR EMOJIS.
@@ -248,30 +276,12 @@ def call_mistral(messages):
     return response.json()["choices"][0]["message"]["content"]
 
 # ============================================
-# FACTS MANAGEMENT
+# FACTS MANAGEMENT (24-HOUR - Channel 98)
 # ============================================
 
 def handle_fact_command(message):
-    global yaya_facts, facts_data, people_memory
+    global yaya_facts, facts_data
     message_lower = message.lower()
-    
-    # Check what Yaya knows about all people
-    if "what do you know about people" in message_lower or "who do you remember" in message_lower:
-        if people_memory:
-            result = "People I remember:\n"
-            for name, facts in people_memory.items():
-                result += f"- {name}: {', '.join(facts)}\n"
-            return result
-        else:
-            return "I don't remember anything about anyone yet. Teach me something! 😏"
-    
-    # Check what Yaya knows about a specific person
-    if "what do you know about" in message_lower:
-        for name in people_memory:
-            if name.lower() in message_lower:
-                facts = people_memory[name]
-                return f"About {name}: {', '.join(facts)}"
-        return "I don't know anything about them yet. 🤔"
     
     if "remember" in message_lower or "remind" in message_lower:
         for cmd in ["remember", "remind"]:
@@ -304,6 +314,32 @@ def handle_fact_command(message):
     return None
 
 # ============================================
+# PEOPLE MEMORY CHECK (Channel 99)
+# ============================================
+
+def handle_people_check(message):
+    global people_memory
+    message_lower = message.lower()
+    
+    if "what do you know about people" in message_lower or "who do you remember" in message_lower:
+        if people_memory:
+            result = "People I remember:\n"
+            for name, facts in people_memory.items():
+                result += f"- {name}: {', '.join(facts)}\n"
+            return result
+        else:
+            return "I don't remember anything about anyone yet. Teach me something! 😏"
+    
+    if "what do you know about" in message_lower:
+        for name in people_memory:
+            if name.lower() in message_lower:
+                facts = people_memory[name]
+                return f"About {name}: {', '.join(facts)}"
+        return "I don't know anything about them yet. 🤔"
+    
+    return None
+
+# ============================================
 # THE BRAIN FUNCTIONS
 # ============================================
 
@@ -314,16 +350,24 @@ def ask_yaya(user_message, speaker_name="Someone"):
     # Check for people learning first (silent)
     handle_people_learning(user_message)
     
-    # Check for fact commands
+    # Check for 24-hour fact commands
     fact_response = handle_fact_command(user_message)
     if fact_response:
         return fact_response
+    
+    # Check for people memory queries
+    people_response = handle_people_check(user_message)
+    if people_response:
+        return people_response
+    
+    # Check if message mentions a person we have facts about
+    mentioned_person = find_mentioned_person(user_message)
     
     conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
     if len(conversation_history) > 20:
         conversation_history.pop(0)
     
-    messages = [{"role": "system", "content": get_system_prompt(speaker_name)}]
+    messages = [{"role": "system", "content": get_system_prompt(speaker_name, mentioned_person)}]
     for msg in conversation_history[-20:]:
         role = "assistant" if msg["role"] == "assistant" else "user"
         messages.append({"role": role, "content": msg["content"]})
@@ -387,13 +431,15 @@ def chat():
     
     speaker = data.get("speaker", "Someone")
     message = data.get("message", "")
-    is_private = data.get("private", "false") in ["true", "yes", True, 1]
+    source_channel = data.get("channel", "0")
     
     if not message:
         return "Error", 400
     
     message_lower = message.lower()
-    if ("remember" in message_lower or "forget" in message_lower) and not is_private:
+    
+    # Public chat - block "remember/forget"
+    if source_channel == "0" and ("remember" in message_lower or "forget" in message_lower):
         print(f"[FACTS] REJECTED public memory command from {speaker}")
         return random.choice(PUBLIC_REJECTIONS)
     
@@ -407,6 +453,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (PEOPLE MEMORY + PRIVATE FIX)")
+    print("YAYA - MISTRAL (MENTION RECALL)")
     print(f"People stored: {len(people_memory)}")
+    print(f"Facts stored: {len(yaya_facts)}")
     app.run(host="0.0.0.0", port=5000, debug=True)
