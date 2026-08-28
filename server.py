@@ -136,7 +136,6 @@ def handle_people_learning(message):
             save_people(people_memory)
             print(f"[PEOPLE] Learned: {name_clean} = {fact}")
         
-        # Return None so Yaya responds normally
         return None
     
     return None
@@ -187,12 +186,10 @@ def get_system_prompt(speaker_name=None):
     current_date = now.strftime("%B %d, %Y")
     facts_text = get_facts_text()
     
-    # Check for people memories about the speaker
     people_text = ""
     if speaker_name:
         speaker_facts = get_person_facts(speaker_name)
         if speaker_facts:
-            # Random 40% chance to mention the fact
             if random.random() < 0.4:
                 facts_list = "\n".join([f"- {fact}" for fact in speaker_facts])
                 people_text = f"""
@@ -255,8 +252,26 @@ def call_mistral(messages):
 # ============================================
 
 def handle_fact_command(message):
-    global yaya_facts, facts_data
+    global yaya_facts, facts_data, people_memory
     message_lower = message.lower()
+    
+    # Check what Yaya knows about all people
+    if "what do you know about people" in message_lower or "who do you remember" in message_lower:
+        if people_memory:
+            result = "People I remember:\n"
+            for name, facts in people_memory.items():
+                result += f"- {name}: {', '.join(facts)}\n"
+            return result
+        else:
+            return "I don't remember anything about anyone yet. Teach me something! 😏"
+    
+    # Check what Yaya knows about a specific person
+    if "what do you know about" in message_lower:
+        for name in people_memory:
+            if name.lower() in message_lower:
+                facts = people_memory[name]
+                return f"About {name}: {', '.join(facts)}"
+        return "I don't know anything about them yet. 🤔"
     
     if "remember" in message_lower or "remind" in message_lower:
         for cmd in ["remember", "remind"]:
@@ -392,6 +407,6 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (PEOPLE MEMORY)")
+    print("YAYA - MISTRAL (PEOPLE MEMORY + CHECK)")
     print(f"People stored: {len(people_memory)}")
     app.run(host="0.0.0.0", port=5000, debug=True)
