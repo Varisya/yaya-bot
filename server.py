@@ -387,7 +387,7 @@ def chat():
     
     speaker = data.get("speaker", "Someone")
     message = data.get("message", "")
-    is_private = data.get("private", "false") == "true"
+    is_private = data.get("private", "false") in ["true", "yes", True, 1]
     
     if not message:
         return "Error", 400
@@ -407,6 +407,6 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (PEOPLE MEMORY + CHECK)")
+    print("YAYA - MISTRAL (PEOPLE MEMORY + PRIVATE FIX)")
     print(f"People stored: {len(people_memory)}")
     app.run(host="0.0.0.0", port=5000, debug=True)
