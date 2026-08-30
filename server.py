@@ -16,6 +16,10 @@ app = Flask(__name__)
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 
+JSONBIN_API_KEY = os.environ.get("JSONBIN_API_KEY")
+JSONBIN_BIN_ID = os.environ.get("JSONBIN_BIN_ID")
+JSONBIN_URL = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}"
+
 conversation_history = []
 
 # ============================================
@@ -36,7 +40,7 @@ def check_rate_limit():
     return True
 
 # ============================================
-# FACTS MEMORY SYSTEM (24-HOUR) - Channel 98
+# FACTS MEMORY SYSTEM (24-HOUR) - Local file
 # ============================================
 
 FACTS_FILE = "yaya_facts.json"
@@ -62,23 +66,42 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# PEOPLE MEMORY SYSTEM (PERMANENT)
+# PEOPLE MEMORY SYSTEM - JSONBin (PERMANENT)
 # ============================================
 
-PEOPLE_FILE = "yaya_people.json"
-
-def load_people():
+def load_people_from_bin():
+    """Load people memory from JSONBin."""
     try:
-        with open(PEOPLE_FILE, "r") as f:
-            return json.load(f)
-    except:
+        headers = {
+            "X-Master-Key": JSONBIN_API_KEY
+        }
+        response = requests.get(JSONBIN_URL, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        record = data.get("record", {})
+        if isinstance(record, dict):
+            return record.get("people", {})
+        return {}
+    except Exception as e:
+        print(f"[JSONBIN] Load error: {e}")
         return {}
 
-def save_people(people_data):
-    with open(PEOPLE_FILE, "w") as f:
-        json.dump(people_data, f)
+def save_people_to_bin(people_data):
+    """Save people memory to JSONBin."""
+    try:
+        headers = {
+            "X-Master-Key": JSONBIN_API_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {"people": people_data}
+        response = requests.put(JSONBIN_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        print(f"[JSONBIN] Saved {len(people_data)} people")
+    except Exception as e:
+        print(f"[JSONBIN] Save error: {e}")
 
-people_memory = load_people()
+# Load people memory at startup
+people_memory = load_people_from_bin()
 
 def extract_person_fact(message):
     """Try to extract [Name] is [fact] from a message. Only for public chat."""
@@ -119,7 +142,7 @@ def extract_person_fact(message):
     return None, None
 
 def handle_people_learning(message):
-    """Silently store facts about people from public chat."""
+    """Silently store facts about people."""
     global people_memory
     
     name, fact = extract_person_fact(message)
@@ -132,7 +155,7 @@ def handle_people_learning(message):
         
         if fact not in people_memory[name_clean]:
             people_memory[name_clean].append(fact)
-            save_people(people_memory)
+            save_people_to_bin(people_memory)
             print(f"[PEOPLE] Learned: {name_clean} = {fact}")
         
         return None
@@ -165,7 +188,6 @@ def find_mentioned_person(message):
         if stored_name.lower() in message_lower:
             return stored_name
     
-    # Check partial matches
     for stored_name in people_memory:
         name_first = stored_name.split()[0].lower()
         if len(name_first) > 2 and name_first in message_lower:
@@ -203,10 +225,8 @@ def get_system_prompt(speaker_name=None, mentioned_person=None):
     current_date = now.strftime("%B %d, %Y")
     facts_text = get_facts_text()
     
-    # Check for people memories about the speaker
     people_text = ""
     
-    # Priority: mentioned person first, then speaker
     if mentioned_person:
         mentioned_facts = get_person_facts(mentioned_person)
         if mentioned_facts and random.random() < 0.4:
@@ -276,7 +296,7 @@ def call_mistral(messages):
     return response.json()["choices"][0]["message"]["content"]
 
 # ============================================
-# FACTS MANAGEMENT (24-HOUR - Channel 98)
+# FACTS MANAGEMENT (24-HOUR)
 # ============================================
 
 def handle_fact_command(message):
@@ -314,7 +334,7 @@ def handle_fact_command(message):
     return None
 
 # ============================================
-# PEOPLE MEMORY CHECK (Channel 99)
+# PEOPLE MEMORY CHECK
 # ============================================
 
 def handle_people_check(message):
@@ -347,20 +367,16 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if not check_rate_limit():
         return "Whoa! Too many people! 😤"
     
-    # Check for people learning first (silent)
     handle_people_learning(user_message)
     
-    # Check for 24-hour fact commands
     fact_response = handle_fact_command(user_message)
     if fact_response:
         return fact_response
     
-    # Check for people memory queries
     people_response = handle_people_check(user_message)
     if people_response:
         return people_response
     
-    # Check if message mentions a person we have facts about
     mentioned_person = find_mentioned_person(user_message)
     
     conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
@@ -438,7 +454,6 @@ def chat():
     
     message_lower = message.lower()
     
-    # Public chat - block "remember/forget"
     if source_channel == "0" and ("remember" in message_lower or "forget" in message_lower):
         print(f"[FACTS] REJECTED public memory command from {speaker}")
         return random.choice(PUBLIC_REJECTIONS)
@@ -453,7 +468,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (MENTION RECALL)")
+    print("YAYA - MISTRAL (JSONBIN MEMORY)")
     print(f"People stored: {len(people_memory)}")
     print(f"Facts stored: {len(yaya_facts)}")
     app.run(host="0.0.0.0", port=5000, debug=True)
