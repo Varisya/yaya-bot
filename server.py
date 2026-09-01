@@ -100,7 +100,6 @@ def save_people_to_bin(people_data):
     except Exception as e:
         print(f"[JSONBIN] Save error: {e}")
 
-# Load people memory at startup
 people_memory = load_people_from_bin()
 
 def extract_person_fact(message):
@@ -114,6 +113,25 @@ def extract_person_fact(message):
     if "remember" in message_lower or "forget" in message_lower:
         return None, None
     
+    # Invalid name words to reject
+    INVALID_NAME_WORDS = [
+        "i", "you", "we", "they", "he", "she", "it", "me", "my", "your",
+        "the", "a", "an", "and", "or", "but", "if", "then", "so", "to",
+        "for", "with", "on", "in", "at", "by", "of", "that", "this",
+        "promise", "swear", "tell", "know", "think", "believe"
+    ]
+    
+    def is_valid_name(name):
+        name_clean = name.strip().rstrip(".!?,")
+        if len(name_clean) < 2 or len(name_clean) > 30:
+            return False
+        if len(name_clean.split()) > 3:
+            return False
+        first_word = name_clean.split()[0].lower().rstrip(".!?,")
+        if first_word in INVALID_NAME_WORDS:
+            return False
+        return True
+    
     if "did you know" in message_lower:
         rest = message_lower.split("did you know", 1)[1].strip()
         for connector in [" is ", " loves ", " always ", " has ", " makes "]:
@@ -122,7 +140,7 @@ def extract_person_fact(message):
                 name = parts[0].strip().rstrip(".!?")
                 fact = parts[1].strip().rstrip(".!?")
                 if name and fact and len(name) > 1 and len(fact) > 1:
-                    if name not in ["who", "what", "where", "when", "why", "how"]:
+                    if is_valid_name(name) and name not in ["who", "what", "where", "when", "why", "how"]:
                         return name, fact
         return None, None
     
@@ -135,7 +153,7 @@ def extract_person_fact(message):
                 fact = parts[1].strip().rstrip(".!?")
                 if name and fact and len(name) > 1 and len(fact) > 1:
                     if "yaya" not in name.lower():
-                        if name not in ["who", "what", "where", "when", "why", "how"]:
+                        if is_valid_name(name) and name not in ["who", "what", "where", "when", "why", "how"]:
                             return name, fact
         return None, None
     
@@ -468,7 +486,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (JSONBIN MEMORY)")
+    print("YAYA - MISTRAL (SMART NAME VALIDATION)")
     print(f"People stored: {len(people_memory)}")
     print(f"Facts stored: {len(yaya_facts)}")
     app.run(host="0.0.0.0", port=5000, debug=True)
