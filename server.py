@@ -5,7 +5,11 @@ import os
 import json
 import time
 import requests
+import sys
 from zoneinfo import ZoneInfo
+
+# Force unbuffered output so logs show immediately
+sys.stdout.reconfigure(line_buffering=True)
 
 # ============================================
 # SETUP
@@ -40,7 +44,7 @@ def check_rate_limit():
     return True
 
 # ============================================
-# FACTS MEMORY SYSTEM (24-HOUR) - Local file
+# FACTS MEMORY SYSTEM (24-HOUR)
 # ============================================
 
 FACTS_FILE = "yaya_facts.json"
@@ -66,15 +70,12 @@ facts_data = load_facts()
 yaya_facts = facts_data.get("facts", [])
 
 # ============================================
-# PEOPLE MEMORY SYSTEM - JSONBin (PERMANENT)
+# PEOPLE MEMORY SYSTEM - JSONBin
 # ============================================
 
 def load_people_from_bin():
-    """Load people memory from JSONBin."""
     try:
-        headers = {
-            "X-Master-Key": JSONBIN_API_KEY
-        }
+        headers = {"X-Master-Key": JSONBIN_API_KEY}
         response = requests.get(JSONBIN_URL, headers=headers)
         response.raise_for_status()
         data = response.json()
@@ -83,11 +84,10 @@ def load_people_from_bin():
             return record.get("people", {})
         return {}
     except Exception as e:
-        print(f"[JSONBIN] Load error: {e}")
+        print(f"[JSONBIN] Load error: {e}", flush=True)
         return {}
 
 def save_people_to_bin(people_data):
-    """Save people memory to JSONBin."""
     try:
         headers = {
             "X-Master-Key": JSONBIN_API_KEY,
@@ -96,16 +96,14 @@ def save_people_to_bin(people_data):
         payload = {"people": people_data}
         response = requests.put(JSONBIN_URL, headers=headers, json=payload)
         response.raise_for_status()
-        print(f"[JSONBIN] Saved {len(people_data)} people")
+        print(f"[JSONBIN] Saved {len(people_data)} people", flush=True)
     except Exception as e:
-        print(f"[JSONBIN] Save error: {e}")
+        print(f"[JSONBIN] Save error: {e}", flush=True)
 
 people_memory = load_people_from_bin()
 
 def extract_person_fact(message):
-    """Try to extract [Name] is [fact] from a message. Only for public chat."""
     message_lower = message.lower()
-    
     if "?" in message and "did you know" not in message_lower:
         return None, None
     if message_lower.startswith(("who ", "what ", "where ", "when ", "why ", "how ")):
@@ -159,57 +157,40 @@ def extract_person_fact(message):
     return None, None
 
 def handle_people_learning(message):
-    """Silently store facts about people."""
     global people_memory
-    
     name, fact = extract_person_fact(message)
-    
     if name and fact:
         name_clean = name.replace(" resident", "").strip()
-        
         if name_clean not in people_memory:
             people_memory[name_clean] = []
-        
         if fact not in people_memory[name_clean]:
             people_memory[name_clean].append(fact)
             save_people_to_bin(people_memory)
-            print(f"[PEOPLE] Learned: {name_clean} = {fact}")
-        
+            print(f"[PEOPLE] Learned: {name_clean} = {fact}", flush=True)
         return None
-    
     return None
 
 def get_person_facts(speaker_name):
-    """Get stored facts about a person by their name."""
     global people_memory
-    
     name_clean = speaker_name.replace(" resident", "").strip()
-    
     if name_clean in people_memory:
         return people_memory[name_clean]
-    
     name_lower = name_clean.lower()
     for stored_name, facts in people_memory.items():
         if name_lower in stored_name.lower() or stored_name.lower() in name_lower:
             return facts
-    
     return None
 
 def find_mentioned_person(message):
-    """Check if a message mentions any person we have facts about."""
     global people_memory
-    
     message_lower = message.lower()
-    
     for stored_name in people_memory:
         if stored_name.lower() in message_lower:
             return stored_name
-    
     for stored_name in people_memory:
         name_first = stored_name.split()[0].lower()
         if len(name_first) > 2 and name_first in message_lower:
             return stored_name
-    
     return None
 
 # ============================================
@@ -243,7 +224,6 @@ def get_system_prompt(speaker_name=None, mentioned_person=None):
     facts_text = get_facts_text()
     
     people_text = ""
-    
     if mentioned_person:
         mentioned_facts = get_person_facts(mentioned_person)
         if mentioned_facts and random.random() < 0.4:
@@ -299,6 +279,11 @@ def is_tt(name):
 # ============================================
 
 def call_mistral(messages):
+    print(f"[MISTRAL] Starting call with {len(messages)} messages", flush=True)
+    print(f"[MISTRAL] API key set: {bool(MISTRAL_API_KEY)}", flush=True)
+    if MISTRAL_API_KEY:
+        print(f"[MISTRAL] Key starts with: {MISTRAL_API_KEY[:8]}...", flush=True)
+    
     headers = {
         "Authorization": f"Bearer {MISTRAL_API_KEY}",
         "Content-Type": "application/json"
@@ -310,25 +295,24 @@ def call_mistral(messages):
     }
     try:
         response = requests.post(MISTRAL_URL, headers=headers, json=payload)
-        print(f"[MISTRAL] Status: {response.status_code}")
+        print(f"[MISTRAL] Status: {response.status_code}", flush=True)
         if response.status_code != 200:
-            print(f"[MISTRAL] Error body: {response.text}")
+            print(f"[MISTRAL] Error body: {response.text}", flush=True)
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        print(f"[MISTRAL] Full error: {e}")
+        print(f"[MISTRAL] Full error: {e}", flush=True)
         if hasattr(e, 'response') and e.response is not None:
-            print(f"[MISTRAL] Response body: {e.response.text}")
+            print(f"[MISTRAL] Response body: {e.response.text}", flush=True)
         raise
 
 # ============================================
-# FACTS MANAGEMENT (24-HOUR)
+# FACTS MANAGEMENT
 # ============================================
 
 def handle_fact_command(message):
     global yaya_facts, facts_data
     message_lower = message.lower()
-    
     if "remember" in message_lower or "remind" in message_lower:
         for cmd in ["remember", "remind"]:
             if cmd in message_lower:
@@ -340,7 +324,6 @@ def handle_fact_command(message):
             facts_data["saved_at"] = datetime.datetime.now().timestamp()
             save_facts(facts_data)
             return "Got it. 📝"
-    
     if "forget" in message_lower:
         fact = message_lower.split("forget", 1)[1].strip().rstrip(".!?")
         for stored_fact in yaya_facts[:]:
@@ -350,13 +333,11 @@ def handle_fact_command(message):
                 save_facts(facts_data)
                 return "Forgotten. 🗑️"
         return "Wasn't remembering that anyway. 🤷‍♀️"
-    
     if "what do you remember" in message_lower:
         if yaya_facts:
             return "I know:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
         else:
             return "Nothing important. 🤔"
-    
     return None
 
 # ============================================
@@ -366,7 +347,6 @@ def handle_fact_command(message):
 def handle_people_check(message):
     global people_memory
     message_lower = message.lower()
-    
     if "what do you know about people" in message_lower or "who do you remember" in message_lower:
         if people_memory:
             result = "People I remember:\n"
@@ -375,14 +355,12 @@ def handle_people_check(message):
             return result
         else:
             return "I don't remember anything about anyone yet. Teach me something! 😏"
-    
     if "what do you know about" in message_lower:
         for name in people_memory:
             if name.lower() in message_lower:
                 facts = people_memory[name]
                 return f"About {name}: {', '.join(facts)}"
         return "I don't know anything about them yet. 🤔"
-    
     return None
 
 # ============================================
@@ -392,28 +370,21 @@ def handle_people_check(message):
 def ask_yaya(user_message, speaker_name="Someone"):
     if not check_rate_limit():
         return "Whoa! Too many people! 😤"
-    
     handle_people_learning(user_message)
-    
     fact_response = handle_fact_command(user_message)
     if fact_response:
         return fact_response
-    
     people_response = handle_people_check(user_message)
     if people_response:
         return people_response
-    
     mentioned_person = find_mentioned_person(user_message)
-    
     conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
     if len(conversation_history) > 20:
         conversation_history.pop(0)
-    
     messages = [{"role": "system", "content": get_system_prompt(speaker_name, mentioned_person)}]
     for msg in conversation_history[-20:]:
         role = "assistant" if msg["role"] == "assistant" else "user"
         messages.append({"role": role, "content": msg["content"]})
-    
     try:
         yaya_reply = call_mistral(messages)
         if not yaya_reply or yaya_reply.strip() == "":
@@ -421,13 +392,11 @@ def ask_yaya(user_message, speaker_name="Someone"):
         conversation_history.append({"role": "assistant", "content": yaya_reply})
         return yaya_reply
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}", flush=True)
         return f"Brain freeze. {type(e).__name__} 🤪"
-
 
 def ask_yaya_for_random_thought(nearby_names):
     mode = random.choices(["general", "personal"], weights=[60, 40])[0]
-    
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
             "Say something bratty about the party. Use emojis!",
@@ -442,12 +411,7 @@ def ask_yaya_for_random_thought(nearby_names):
             prompt = f"You noticed {chosen_name} nearby. Say something shy and lovestruck directly TO her. Use her name. Heart emojis. One sentence."
         else:
             prompt = f"You noticed {chosen_name} in the club. Call them out by name and give them a fun, bratty welcome or tease. Use their name at the START of your sentence. Use emojis. One sentence."
-    
-    messages = [
-        {"role": "system", "content": get_system_prompt()},
-        {"role": "user", "content": prompt}
-    ]
-    
+    messages = [{"role": "system", "content": get_system_prompt()}, {"role": "user", "content": prompt}]
     try:
         yaya_reply = call_mistral(messages)
         if not yaya_reply or yaya_reply.strip() == "":
@@ -470,20 +434,14 @@ def chat():
     data = request.get_json()
     if not data:
         return "Error", 400
-    
     speaker = data.get("speaker", "Someone")
     message = data.get("message", "")
     source_channel = data.get("channel", "0")
-    
     if not message:
         return "Error", 400
-    
     message_lower = message.lower()
-    
     if source_channel == "0" and ("remember" in message_lower or "forget" in message_lower):
-        print(f"[FACTS] REJECTED public memory command from {speaker}")
         return random.choice(PUBLIC_REJECTIONS)
-    
     return ask_yaya(message, speaker)
 
 @app.route("/autonomous-smart", methods=["POST"])
@@ -494,7 +452,10 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (DETAILED LOGGING)")
-    print(f"People stored: {len(people_memory)}")
-    print(f"Facts stored: {len(yaya_facts)}")
+    print("YAYA - MISTRAL (DETAILED LOGGING + FLUSH)", flush=True)
+    print(f"People stored: {len(people_memory)}", flush=True)
+    print(f"Facts stored: {len(yaya_facts)}", flush=True)
+    print(f"Mistral key set: {bool(MISTRAL_API_KEY)}", flush=True)
+    if MISTRAL_API_KEY:
+        print(f"Mistral key starts: {MISTRAL_API_KEY[:8]}...", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
