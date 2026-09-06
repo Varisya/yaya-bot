@@ -113,7 +113,6 @@ def extract_person_fact(message):
     if "remember" in message_lower or "forget" in message_lower:
         return None, None
     
-    # Invalid name words to reject
     INVALID_NAME_WORDS = [
         "i", "you", "we", "they", "he", "she", "it", "me", "my", "your",
         "the", "a", "an", "and", "or", "but", "if", "then", "so", "to",
@@ -296,7 +295,7 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
-# MISTRAL API CALL
+# MISTRAL API CALL (WITH DETAILED LOGGING)
 # ============================================
 
 def call_mistral(messages):
@@ -309,9 +308,18 @@ def call_mistral(messages):
         "messages": messages,
         "temperature": 0.8
     }
-    response = requests.post(MISTRAL_URL, headers=headers, json=payload)
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"]
+    try:
+        response = requests.post(MISTRAL_URL, headers=headers, json=payload)
+        print(f"[MISTRAL] Status: {response.status_code}")
+        if response.status_code != 200:
+            print(f"[MISTRAL] Error body: {response.text}")
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"[MISTRAL] Full error: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"[MISTRAL] Response body: {e.response.text}")
+        raise
 
 # ============================================
 # FACTS MANAGEMENT (24-HOUR)
@@ -486,7 +494,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (SMART NAME VALIDATION)")
+    print("YAYA - MISTRAL (DETAILED LOGGING)")
     print(f"People stored: {len(people_memory)}")
     print(f"Facts stored: {len(yaya_facts)}")
     app.run(host="0.0.0.0", port=5000, debug=True)
