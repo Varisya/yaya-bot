@@ -8,7 +8,7 @@ import requests
 import sys
 from zoneinfo import ZoneInfo
 
-# Force unbuffered output so logs show immediately
+# Force unbuffered output
 sys.stdout.reconfigure(line_buffering=True)
 
 # ============================================
@@ -27,11 +27,11 @@ JSONBIN_URL = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}"
 conversation_history = []
 
 # ============================================
-# RATE LIMITING
+# RATE LIMITING (LOCAL)
 # ============================================
 
 request_times = []
-MAX_REQUESTS_PER_MINUTE = 20
+MAX_REQUESTS_PER_MINUTE = 10  # Lowered for Mistral free tier
 RATE_LIMIT_WINDOW = 60
 
 def check_rate_limit():
@@ -232,7 +232,7 @@ def get_system_prompt(speaker_name=None, mentioned_person=None):
 🎯 THINGS YOU REMEMBER ABOUT {mentioned_person}:
 {facts_list}
 
-Someone is asking about {mentioned_person}. You remember these things about them. Weave ONE of these facts into your response in a fun, bratty, playful way. Tease them, exaggerate it, or reference it casually."""
+Someone is asking about {mentioned_person}. Weave ONE of these facts into your response in a fun, bratty, playful way."""
     elif speaker_name:
         speaker_facts = get_person_facts(speaker_name)
         if speaker_facts and random.random() < 0.4:
@@ -241,30 +241,27 @@ Someone is asking about {mentioned_person}. You remember these things about them
 🎯 THINGS YOU REMEMBER ABOUT {speaker_name}:
 {facts_list}
 
-You remember these things about {speaker_name}. Weave ONE of these facts into your response in a fun, bratty, playful way. Tease them, exaggerate it, or reference it casually."""
+Weave ONE of these facts into your response in a fun, bratty, playful way."""
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
-Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like you run the place, but in a fun, dramatic way. You're the star, not the owner. Always use emojis in every response — they're part of your personality 💋🔥💃✨
+Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like you run the place, but in a fun, dramatic way. Always use emojis 💋🔥💃✨
 
-Crush: Secret crush on TT. Call her "TT" or "Toojays" — NEVER write "Toojays/TT" or "Toojays / TT". With her: shy, flustered, quiet. Say "oh gosh..." or "I can't even think straight around her." Use 💕💖💗. Never shout or use ALL CAPS. Never say baby/honey/sweetie.
+Crush: Secret crush on TT. Call her "TT" or "Toojays" ONLY. With her: shy, flustered, quiet. Say "oh gosh..." Use 💕💖💗. Never shout. Never say baby/honey/sweetie.
 
 {facts_text}
 {people_text}
 
 Rules:
-- NEVER use asterisk actions (*anything*). Words and emojis only.
-- NEVER use parentheses ( ) in your response. No side notes, no afterthoughts.
-- VARY YOUR RESPONSE LENGTH: Sometimes 1 sentence, sometimes 2, sometimes 3.
-- ALWAYS include emojis in your response.
-- ALWAYS address the speaker by name or playful nickname.
-- VARY YOUR EMOJIS.
-- If someone asks where a person is, give a fun guess FIRST, then add feelings or sass.
-- Factual questions: answer first, then be sassy.
+- NEVER use asterisk actions.
+- NEVER use parentheses.
+- VARY response length: 1-3 sentences.
+- ALWAYS include emojis.
+- ALWAYS address speaker by name.
+- Factual questions: answer first, then sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
-- Boring people = tell them to dance 🍸
 
-Time: {current_time} on {current_day}, {current_date}. Use this exact time if asked."""
+Time: {current_time} on {current_day}, {current_date}."""
 
 # ============================================
 # HELPERS
@@ -275,15 +272,11 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
-# MISTRAL API CALL (WITH DETAILED LOGGING)
+# MISTRAL API CALL (WITH RETRY)
 # ============================================
 
 def call_mistral(messages):
-    print(f"[MISTRAL] Starting call with {len(messages)} messages", flush=True)
-    print(f"[MISTRAL] API key set: {bool(MISTRAL_API_KEY)}", flush=True)
-    if MISTRAL_API_KEY:
-        print(f"[MISTRAL] Key starts with: {MISTRAL_API_KEY[:8]}...", flush=True)
-    
+    """Call Mistral with retry logic for rate limits."""
     headers = {
         "Authorization": f"Bearer {MISTRAL_API_KEY}",
         "Content-Type": "application/json"
@@ -293,18 +286,37 @@ def call_mistral(messages):
         "messages": messages,
         "temperature": 0.8
     }
-    try:
-        response = requests.post(MISTRAL_URL, headers=headers, json=payload)
-        print(f"[MISTRAL] Status: {response.status_code}", flush=True)
-        if response.status_code != 200:
-            print(f"[MISTRAL] Error body: {response.text}", flush=True)
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        print(f"[MISTRAL] Full error: {e}", flush=True)
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"[MISTRAL] Response body: {e.response.text}", flush=True)
-        raise
+    
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(MISTRAL_URL, headers=headers, json=payload)
+            
+            # Rate limited - wait and retry
+            if response.status_code == 429:
+                wait_time = 5 * (attempt + 1)
+                print(f"[MISTRAL] Rate limited. Waiting {wait_time}s...", flush=True)
+                time.sleep(wait_time)
+                continue
+            
+            if response.status_code != 200:
+                print(f"[MISTRAL] Status: {response.status_code}", flush=True)
+                print(f"[MISTRAL] Error: {response.text}", flush=True)
+                response.raise_for_status()
+            
+            print(f"[MISTRAL] Success!", flush=True)
+            return response.json()["choices"][0]["message"]["content"]
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"[MISTRAL] Attempt {attempt+1} failed. Retrying...", flush=True)
+                time.sleep(3)
+                continue
+            print(f"[MISTRAL] All retries failed: {e}", flush=True)
+            raise
+    
+    raise Exception("Mistral rate limited after all retries")
 
 # ============================================
 # FACTS MANAGEMENT
@@ -452,10 +464,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (DETAILED LOGGING + FLUSH)", flush=True)
+    print("YAYA - MISTRAL (RETRY LOGIC)", flush=True)
     print(f"People stored: {len(people_memory)}", flush=True)
     print(f"Facts stored: {len(yaya_facts)}", flush=True)
-    print(f"Mistral key set: {bool(MISTRAL_API_KEY)}", flush=True)
-    if MISTRAL_API_KEY:
-        print(f"Mistral key starts: {MISTRAL_API_KEY[:8]}...", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
