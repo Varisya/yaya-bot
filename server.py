@@ -214,7 +214,7 @@ def get_facts_text():
         return ""
     return "📓 Facts you've been told:\n" + "\n".join([f"- {fact}" for fact in yaya_facts])
 
-def get_system_prompt(speaker_name=None, mentioned_person=None):
+def get_system_prompt(speaker_name=None, mentioned_person=None, is_batch=False):
     CLUB_TIMEZONE = 'America/Los_Angeles'
     now = datetime.datetime.now(ZoneInfo(CLUB_TIMEZONE))
     current_time = now.strftime("%I:%M %p")
@@ -223,7 +223,10 @@ def get_system_prompt(speaker_name=None, mentioned_person=None):
     facts_text = get_facts_text()
     
     people_text = ""
-    if mentioned_person:
+    
+    if is_batch:
+        people_text = "\n\nMULTIPLE PEOPLE ARE TALKING TO YOU. Respond to ALL of them in ONE message. Address each person by name. Keep it natural and fun."
+    elif mentioned_person:
         mentioned_facts = get_person_facts(mentioned_person)
         if mentioned_facts and random.random() < 0.4:
             facts_list = "\n".join([f"- {fact}" for fact in mentioned_facts])
@@ -275,7 +278,6 @@ def is_tt(name):
 # ============================================
 
 def call_groq(messages):
-    """Call Groq with retry logic."""
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
@@ -380,21 +382,31 @@ def handle_people_check(message):
 def ask_yaya(user_message, speaker_name="Someone"):
     if not check_rate_limit():
         return "Whoa! Too many people! 😤"
+    
+    # Check if this is a batched message (contains | separator)
+    is_batch = "|" in user_message
+    
     handle_people_learning(user_message)
+    
     fact_response = handle_fact_command(user_message)
     if fact_response:
         return fact_response
+    
     people_response = handle_people_check(user_message)
     if people_response:
         return people_response
+    
     mentioned_person = find_mentioned_person(user_message)
-    conversation_history.append({"role": "user", "content": f"{speaker_name}: {user_message}"})
+    
+    conversation_history.append({"role": "user", "content": f"{user_message}"})
     if len(conversation_history) > 20:
         conversation_history.pop(0)
-    messages = [{"role": "system", "content": get_system_prompt(speaker_name, mentioned_person)}]
+    
+    messages = [{"role": "system", "content": get_system_prompt(speaker_name, mentioned_person, is_batch)}]
     for msg in conversation_history[-20:]:
         role = "assistant" if msg["role"] == "assistant" else "user"
         messages.append({"role": role, "content": msg["content"]})
+    
     try:
         yaya_reply = call_groq(messages)
         if not yaya_reply or yaya_reply.strip() == "":
@@ -404,6 +416,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
     except Exception as e:
         print(f"Error: {e}", flush=True)
         return f"Brain freeze. {type(e).__name__} 🤪"
+
 
 def ask_yaya_for_random_thought(nearby_names):
     mode = random.choices(["general", "personal"], weights=[60, 40])[0]
@@ -462,8 +475,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - GROQ (RETRY LOGIC)", flush=True)
+    print("YAYA - GROQ (BATCHING)", flush=True)
     print(f"People stored: {len(people_memory)}", flush=True)
     print(f"Facts stored: {len(yaya_facts)}", flush=True)
-    print(f"Groq key set: {bool(GROQ_API_KEY)}", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
