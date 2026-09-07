@@ -8,7 +8,6 @@ import requests
 import sys
 from zoneinfo import ZoneInfo
 
-# Force unbuffered output
 sys.stdout.reconfigure(line_buffering=True)
 
 # ============================================
@@ -17,8 +16,8 @@ sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
 
-MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
-MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 JSONBIN_API_KEY = os.environ.get("JSONBIN_API_KEY")
 JSONBIN_BIN_ID = os.environ.get("JSONBIN_BIN_ID")
@@ -27,11 +26,11 @@ JSONBIN_URL = f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}"
 conversation_history = []
 
 # ============================================
-# RATE LIMITING (LOCAL)
+# RATE LIMITING
 # ============================================
 
 request_times = []
-MAX_REQUESTS_PER_MINUTE = 10  # Lowered for Mistral free tier
+MAX_REQUESTS_PER_MINUTE = 20
 RATE_LIMIT_WINDOW = 60
 
 def check_rate_limit():
@@ -272,17 +271,17 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
-# MISTRAL API CALL (WITH RETRY)
+# GROQ API CALL (WITH RETRY)
 # ============================================
 
-def call_mistral(messages):
-    """Call Mistral with retry logic for rate limits."""
+def call_groq(messages):
+    """Call Groq with retry logic."""
     headers = {
-        "Authorization": f"Bearer {MISTRAL_API_KEY}",
+        "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "mistral-small-latest",
+        "model": "openai/gpt-oss-20b",
         "messages": messages,
         "temperature": 0.8
     }
@@ -291,32 +290,31 @@ def call_mistral(messages):
     
     for attempt in range(max_retries):
         try:
-            response = requests.post(MISTRAL_URL, headers=headers, json=payload)
+            response = requests.post(GROQ_URL, headers=headers, json=payload)
             
-            # Rate limited - wait and retry
             if response.status_code == 429:
                 wait_time = 5 * (attempt + 1)
-                print(f"[MISTRAL] Rate limited. Waiting {wait_time}s...", flush=True)
+                print(f"[GROQ] Rate limited. Waiting {wait_time}s...", flush=True)
                 time.sleep(wait_time)
                 continue
             
             if response.status_code != 200:
-                print(f"[MISTRAL] Status: {response.status_code}", flush=True)
-                print(f"[MISTRAL] Error: {response.text}", flush=True)
+                print(f"[GROQ] Status: {response.status_code}", flush=True)
+                print(f"[GROQ] Error: {response.text}", flush=True)
                 response.raise_for_status()
             
-            print(f"[MISTRAL] Success!", flush=True)
+            print(f"[GROQ] Success!", flush=True)
             return response.json()["choices"][0]["message"]["content"]
             
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"[MISTRAL] Attempt {attempt+1} failed. Retrying...", flush=True)
+                print(f"[GROQ] Attempt {attempt+1} failed. Retrying...", flush=True)
                 time.sleep(3)
                 continue
-            print(f"[MISTRAL] All retries failed: {e}", flush=True)
+            print(f"[GROQ] All retries failed: {e}", flush=True)
             raise
     
-    raise Exception("Mistral rate limited after all retries")
+    raise Exception("Groq failed after all retries")
 
 # ============================================
 # FACTS MANAGEMENT
@@ -398,7 +396,7 @@ def ask_yaya(user_message, speaker_name="Someone"):
         role = "assistant" if msg["role"] == "assistant" else "user"
         messages.append({"role": role, "content": msg["content"]})
     try:
-        yaya_reply = call_mistral(messages)
+        yaya_reply = call_groq(messages)
         if not yaya_reply or yaya_reply.strip() == "":
             yaya_reply = "Ugh, brain blank. 🤪"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -425,7 +423,7 @@ def ask_yaya_for_random_thought(nearby_names):
             prompt = f"You noticed {chosen_name} in the club. Call them out by name and give them a fun, bratty welcome or tease. Use their name at the START of your sentence. Use emojis. One sentence."
     messages = [{"role": "system", "content": get_system_prompt()}, {"role": "user", "content": prompt}]
     try:
-        yaya_reply = call_mistral(messages)
+        yaya_reply = call_groq(messages)
         if not yaya_reply or yaya_reply.strip() == "":
             yaya_reply = "Party's lit! 💅✨"
         conversation_history.append({"role": "assistant", "content": yaya_reply})
@@ -464,7 +462,8 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - MISTRAL (RETRY LOGIC)", flush=True)
+    print("YAYA - GROQ (RETRY LOGIC)", flush=True)
     print(f"People stored: {len(people_memory)}", flush=True)
     print(f"Facts stored: {len(yaya_facts)}", flush=True)
+    print(f"Groq key set: {bool(GROQ_API_KEY)}", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
