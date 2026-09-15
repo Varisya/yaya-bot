@@ -383,7 +383,6 @@ def ask_yaya(user_message, speaker_name="Someone"):
     if not check_rate_limit():
         return "Whoa! Too many people! 😤"
     
-    # Check if this is a batched message (contains | separator)
     is_batch = "|" in user_message
     
     handle_people_learning(user_message)
@@ -419,7 +418,14 @@ def ask_yaya(user_message, speaker_name="Someone"):
 
 
 def ask_yaya_for_random_thought(nearby_names):
+    # Filter out bad names
+    BAD_NAMES = ["user", "resident", "unknown", "anonymous", "user resident"]
+    nearby_names = [n for n in nearby_names if n.lower() not in BAD_NAMES and len(n) > 2]
+    
+    print(f"[RANDOM] Filtered names: {nearby_names}", flush=True)
+    
     mode = random.choices(["general", "personal"], weights=[60, 40])[0]
+    
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
             "Say something bratty about the party. Use emojis!",
@@ -434,6 +440,7 @@ def ask_yaya_for_random_thought(nearby_names):
             prompt = f"You noticed {chosen_name} nearby. Say something shy and lovestruck directly TO her. Use her name. Heart emojis. One sentence."
         else:
             prompt = f"You noticed {chosen_name} in the club. Call them out by name and give them a fun, bratty welcome or tease. Use their name at the START of your sentence. Use emojis. One sentence."
+    
     messages = [{"role": "system", "content": get_system_prompt()}, {"role": "user", "content": prompt}]
     try:
         yaya_reply = call_groq(messages)
@@ -475,7 +482,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - GROQ (BATCHING)", flush=True)
+    print("YAYA - GROQ (BAD NAME FILTER)", flush=True)
     print(f"People stored: {len(people_memory)}", flush=True)
     print(f"Facts stored: {len(yaya_facts)}", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
