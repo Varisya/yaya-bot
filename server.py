@@ -114,7 +114,8 @@ def extract_person_fact(message):
         "i", "you", "we", "they", "he", "she", "it", "me", "my", "your",
         "the", "a", "an", "and", "or", "but", "if", "then", "so", "to",
         "for", "with", "on", "in", "at", "by", "of", "that", "this",
-        "promise", "swear", "tell", "know", "think", "believe"
+        "promise", "swear", "tell", "know", "think", "believe",
+        "user", "resident", "unknown", "anonymous"
     ]
     
     def is_valid_name(name):
@@ -125,6 +126,9 @@ def extract_person_fact(message):
             return False
         first_word = name_clean.split()[0].lower().rstrip(".!?,")
         if first_word in INVALID_NAME_WORDS:
+            return False
+        name_lower = name_clean.lower()
+        if "user" in name_lower or "resident" in name_lower:
             return False
         return True
     
@@ -253,6 +257,8 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" ONLY. With her: shy, flust
 
 {facts_text}
 {people_text}
+
+🚨 CRITICAL RULE: NEVER say "User", "Resident", "Unknown", or "Anonymous" as names. These are NOT real names. If you see these anywhere, IGNORE them completely. Only use the actual display names given to you.
 
 Rules:
 - NEVER use asterisk actions.
@@ -418,9 +424,21 @@ def ask_yaya(user_message, speaker_name="Someone"):
 
 
 def ask_yaya_for_random_thought(nearby_names):
-    # Filter out bad names
-    BAD_NAMES = ["user", "resident", "unknown", "anonymous", "user resident"]
-    nearby_names = [n for n in nearby_names if n.lower() not in BAD_NAMES and len(n) > 2]
+    # Stronger filter for bad names
+    def is_bad_name(name):
+        name_lower = name.lower().strip()
+        bad_exact = ["user", "resident", "unknown", "anonymous"]
+        bad_contains = ["user", "resident", "unknown"]
+        if name_lower in bad_exact:
+            return True
+        for bad in bad_contains:
+            if bad in name_lower:
+                return True
+        if len(name) < 2:
+            return True
+        return False
+    
+    nearby_names = [n for n in nearby_names if not is_bad_name(n)]
     
     print(f"[RANDOM] Filtered names: {nearby_names}", flush=True)
     
@@ -482,7 +500,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - GROQ (BAD NAME FILTER)", flush=True)
+    print("YAYA - GROQ (NO USER RULE)", flush=True)
     print(f"People stored: {len(people_memory)}", flush=True)
     print(f"Facts stored: {len(yaya_facts)}", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
