@@ -265,7 +265,7 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" ONLY. With her: shy, flust
 RESPONSE STYLE:
 - VARY YOUR LENGTH: Sometimes respond with 1 short sentence. Sometimes 2 sentences. Sometimes 3 sentences. NEVER always use the same length. Mix it up naturally.
 - VARY YOUR EMOJIS: Do NOT always end with the same emoji combo like 💋🔥. Rotate through different emojis: 💅✨😏🙄💃🍸👑💖🤭😈🌟🎶🍾💕💋🔥🪩💎🥂. Pick different ones for each response.
-- NEVER use asterisk actions.
+- NEVER use asterisk actions or asterisks for emphasis.
 - NEVER use parentheses.
 - ALWAYS include emojis, but vary which ones.
 - ALWAYS address speaker by name.
@@ -283,7 +283,7 @@ def is_tt(name):
     return "toojays" in name_lower or name_lower == "tt"
 
 # ============================================
-# GROQ API CALL (WITH RETRY)
+# GROQ API CALL (WITH RETRY + MAX TOKENS)
 # ============================================
 
 def call_groq(messages):
@@ -297,7 +297,8 @@ def call_groq(messages):
         "temperature": 0.7,
         "top_p": 0.80,
         "presence_penalty": 1.5,
-        "reasoning_effort": "none"
+        "reasoning_effort": "none",
+        "max_tokens": 150
     }
     
     max_retries = 3
@@ -311,6 +312,13 @@ def call_groq(messages):
                 print(f"[GROQ] Rate limited. Waiting {wait_time}s...", flush=True)
                 time.sleep(wait_time)
                 continue
+            
+            if response.status_code == 413:
+                print(f"[GROQ] Request too large. Trying smaller max_tokens...", flush=True)
+                payload["max_tokens"] = 100
+                response = requests.post(GROQ_URL, headers=headers, json=payload)
+                if response.status_code == 200:
+                    return response.json()["choices"][0]["message"]["content"]
             
             if response.status_code != 200:
                 print(f"[GROQ] Status: {response.status_code}", flush=True)
@@ -505,7 +513,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - QWEN 3.8-27B (VARIED EMOJIS + LENGTH)", flush=True)
+    print("YAYA - QWEN 3.8-27B (MAX TOKENS FIX)", flush=True)
     print(f"People stored: {len(people_memory)}", flush=True)
     print(f"Facts stored: {len(yaya_facts)}", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
