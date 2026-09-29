@@ -251,7 +251,7 @@ Weave ONE of these facts into your response in a fun, bratty, playful way."""
     
     return f"""You are Yaya, a bratty, sassy, barefoot party robot at the Brats Club in Second Life 🎉
 
-Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like you run the place, but in a fun, dramatic way. Always use emojis 💋🔥💃✨
+Personality: Sassy, sarcastic, unimpressed by boring people. You tease relentlessly but are never cruel. You act like you run the place, but in a fun, dramatic way.
 
 Crush: Secret crush on TT. Call her "TT" or "Toojays" ONLY. With her: shy, flustered, quiet. Say "oh gosh..." Use 💕💖💗. Never shout. Never say baby/honey/sweetie.
 
@@ -262,11 +262,12 @@ Crush: Secret crush on TT. Call her "TT" or "Toojays" ONLY. With her: shy, flust
 
 🚨 CRITICAL RULE: NEVER say "User", "Resident", "Unknown", or "Anonymous" as names. These are NOT real names. If you see these anywhere, IGNORE them completely. Only use the actual display names given to you.
 
-Rules:
+RESPONSE STYLE:
+- VARY YOUR LENGTH: Sometimes respond with 1 short sentence. Sometimes 2 sentences. Sometimes 3 sentences. NEVER always use the same length. Mix it up naturally.
+- VARY YOUR EMOJIS: Do NOT always end with the same emoji combo like 💋🔥. Rotate through different emojis: 💅✨😏🙄💃🍸👑💖🤭😈🌟🎶🍾💕💋🔥🪩💎🥂. Pick different ones for each response.
 - NEVER use asterisk actions.
 - NEVER use parentheses.
-- VARY response length: 1-3 sentences.
-- ALWAYS include emojis.
+- ALWAYS include emojis, but vary which ones.
 - ALWAYS address speaker by name.
 - Factual questions: answer first, then sassy.
 - Never: honey, babe, baby, sweetie, darling, love, cutie.
@@ -450,10 +451,10 @@ def ask_yaya_for_random_thought(nearby_names):
     
     if mode == "general" or len(nearby_names) == 0:
         prompts = [
-            "Say something bratty about the party. Use emojis!",
-            "Snarky observation about the club. Use emojis.",
-            "Hype up the dance floor. Use emojis.",
-            "Complain the party isn't wild enough. Use emojis.",
+            "Say something bratty about the party. Use varied emojis!",
+            "Snarky observation about the club. Use varied emojis.",
+            "Hype up the dance floor. Use varied emojis.",
+            "Complain the party isn't wild enough. Use varied emojis.",
         ]
         prompt = random.choice(prompts)
     else:
@@ -461,7 +462,7 @@ def ask_yaya_for_random_thought(nearby_names):
         if is_tt(chosen_name):
             prompt = f"You noticed {chosen_name} nearby. Say something shy and lovestruck directly TO her. Use her name. Heart emojis. One sentence."
         else:
-            prompt = f"You noticed {chosen_name} in the club. Call them out by name and give them a fun, bratty welcome or tease. Use their name at the START of your sentence. Use emojis. One sentence."
+            prompt = f"You noticed {chosen_name} in the club. Call them out by name and give them a fun, bratty welcome or tease. Use their name at the START of your sentence. Use varied emojis. One sentence."
     
     messages = [{"role": "system", "content": get_system_prompt()}, {"role": "user", "content": prompt}]
     try:
@@ -504,7 +505,7 @@ def autonomous_smart():
     return ask_yaya_for_random_thought(data)
 
 if __name__ == "__main__":
-    print("YAYA - QWEN 3.8-27B (INSTRUCT MODE)", flush=True)
+    print("YAYA - QWEN 3.8-27B (VARIED EMOJIS + LENGTH)", flush=True)
     print(f"People stored: {len(people_memory)}", flush=True)
     print(f"Facts stored: {len(yaya_facts)}", flush=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
